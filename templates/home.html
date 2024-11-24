@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>홈</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; }
+        .logout { padding: 5px 10px; background-color: #f44336; color: white; text-decoration: none; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>안녕하세요! {{ username }}님 환영합니다!</h2>
+        <a href="{{ url_for('logout') }}" class="logout">로그아웃</a>
+    </div>
+    <p>당신의 역할: {{ role }}</p>
+    
+    <!-- 역할별 메뉴 표시 -->
+    {% if role == 'Student' %}
+        <h3>학생 메뉴</h3>
+        <!-- 학생용 메뉴 추가 -->
+    {% elif role == 'Professor' %}
+        <h3>교수 메뉴</h3>
+        <!-- 교수용 메뉴 추가 -->
+    {% elif role == 'Villain' %}
+        <h3>빌런 메뉴</h3>
+        <!-- 빌런용 메뉴 추가 -->
+    {% elif role == 'Muggle' %}
+        <h3>머글 메뉴</h3>
+        <!-- 머글용 메뉴 추가 -->
+    {% endif %}
+</body>
+</html> 
