@@ -322,7 +322,7 @@ def buy_item(item_id):
         
         result = cur.fetchone()
         if not result:
-            raise Exception("물건 또는 사용자 정보를 찾을 수 없습니다.")
+            raise Exception("물건 또는 사용자 정보를 을 수 없습니다.")
             
         price, money, item_name = result
         total_cost = price * amount
@@ -776,7 +776,7 @@ QUIZ_DATABASE = [
         "correct_answer": 1
     },
     {
-        "question": "세계에서 가장 긴 강은?",
+        "question": "세계에��� 가장 긴 강은?",
         "options": ["나일강", "아마존강", "양쯔강", "미시시피강"],
         "correct_answer": 0
     },
@@ -990,7 +990,7 @@ def battle():
         
         opponent_stats = cur.fetchone()
         if not opponent_stats:
-            raise Exception("상대방 정보를 찾을 수 없습니다.")
+            raise Exception("상대방 정보를 찾을 수 없니다.")
         
         opponent_attack, opponent_role = opponent_stats
         
@@ -1057,6 +1057,308 @@ def battle():
     finally:
         cur.close()
         conn.close()
+
+######################## Student #############################
+@app.route('/student/courses')
+@login_required
+def view_courses():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    sort_by = request.args.get('sort', 'magic_name_asc')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 강의 목록 조회 쿼리
+        query = """
+            SELECT m.magic_id, m.magic_name, p.name as professor_name,
+                   c.capacity, c.current_enrollment, c.opening_status,
+                   CASE WHEN e.student_id IS NOT NULL THEN true ELSE false END as is_enrolled
+            FROM Magic m
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Professor pr ON c.instructor_id = pr.professor_id
+            JOIN Person p ON pr.professor_id = p.id
+            LEFT JOIN Enrollment e ON m.magic_id = e.course_id AND e.student_id = %s
+        """
+        
+        # 정렬 조건 적용
+        sort_mapping = {
+            'magic_name_asc': 'magic_name ASC',
+            'magic_name_desc': 'magic_name DESC',
+            'professor_asc': 'professor_name ASC',
+            'professor_desc': 'professor_name DESC',
+            'capacity_asc': 'capacity ASC',
+            'capacity_desc': 'capacity DESC'
+        }
+        query += f" ORDER BY {sort_mapping.get(sort_by, 'magic_name ASC')}"
+        
+        cur.execute(query, (session['user_id'],))
+        courses = cur.fetchall()
+        
+        return render_template('student/courses.html', 
+                             courses=courses,
+                             sort_by=sort_by)
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/student/enroll/<int:magic_id>', methods=['POST'])
+@login_required
+def enroll_course(magic_id):
+    if session.get('role') != 'Student':
+        return jsonify({'success': False, 'message': '학생만 수강신청할 수 있습니다.'})
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 수강 가능 여부 확인
+        cur.execute("""
+            SELECT c.capacity, c.current_enrollment, c.opening_status
+            FROM Course c
+            WHERE c.course_id = %s
+        """, (magic_id,))
+        
+        course_info = cur.fetchone()
+        if not course_info:
+            raise Exception("강의를 찾을 수 없습니다.")
+        
+        capacity, current_enrollment, opening_status = course_info
+        
+        if not opening_status:
+            raise Exception("수강신청이 마감된 강의입니다.")
+        
+        if current_enrollment >= capacity:
+            raise Exception("수강 정원이 초과되었습니다.")
+        
+        # 수강신청 처리
+        cur.execute("""
+            INSERT INTO Enrollment (course_id, student_id)
+            VALUES (%s, %s)
+        """, (magic_id, session['user_id']))
+        
+        # 현재 수강 인원 증가
+        cur.execute("""
+            UPDATE Course
+            SET current_enrollment = current_enrollment + 1,
+                opening_status = CASE 
+                    WHEN current_enrollment + 1 >= capacity THEN false 
+                    ELSE true 
+                END
+            WHERE course_id = %s
+        """, (magic_id,))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '수강신청이 완료되었습니다.'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/student/submit_nsentence/<int:magic_id>', methods=['POST'])
+@login_required
+def submit_nsentence(magic_id):
+    if session.get('role') != 'Student':
+        return jsonify({'success': False, 'message': '학생만 N행시를 제출할 수 있습니다.'})
+    
+    content = request.form.get('content')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 수강 여부 확인
+        cur.execute("""
+            SELECT 1 FROM Enrollment
+            WHERE course_id = %s AND student_id = %s
+        """, (magic_id, session['user_id']))
+        
+        if not cur.fetchone():
+            raise Exception("수강 중인 강의가 아닙니다.")
+        
+        # N행시 제출/수정
+        cur.execute("""
+            INSERT INTO Magic_NSentence (magic_id, student_id, content)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (magic_id, student_id) 
+            DO UPDATE SET content = EXCLUDED.content
+        """, (magic_id, session['user_id'], content))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': 'N행시가 제출되었습니다.'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+######################## Professor #############################
+@app.route('/professor/research')
+@login_required
+def magic_research():
+    if session.get('role') != 'Professor':
+        flash('교수만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    return render_template('professor/research.html')
+
+@app.route('/professor/research/attempt', methods=['POST'])
+@login_required
+def attempt_research():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 연구를 할 수 있습니다.'})
+    
+    # 10% 확률로 연구 성공
+    if random.random() <= 0.5:# 수정하기
+        # 3~8 글자 랜덤 배정
+        name_length = random.randint(3, 8)
+        return jsonify({
+            'success': True,
+            'message': '연구에 성공했습니다!',
+            'name_length': name_length
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': '연구에 실패했습니다. 다시 시도해주세요.'
+        })
+
+@app.route('/professor/create_magic', methods=['POST'])
+@login_required
+def create_magic():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 마법을 만들 수 있습니다.'})
+    
+    magic_name = request.form.get('magic_name')
+    power = random.randint(5, 15)  # 랜덤 공격력 배정
+    capacity = int(request.form.get('capacity', 30))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # Magic 테이블에 추가
+        cur.execute("""
+            INSERT INTO Magic (magic_name, power, creator_id)
+            VALUES (%s, %s, %s)
+            RETURNING magic_id
+        """, (magic_name, power, session['user_id']))
+        
+        magic_id = cur.fetchone()[0]
+        
+        # Course 테이블에 추가
+        cur.execute("""
+            INSERT INTO Course (course_id, instructor_id, capacity)
+            VALUES (%s, %s, %s)
+        """, (magic_id, session['user_id'], capacity))
+        
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f'마법 "{magic_name}"이(가) 생성되었습니다.'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/professor/grade_students')
+@login_required
+def view_students():
+    if session.get('role') != 'Professor':
+        flash('교수만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 교수가 개설한 강의와 학생들의 N행시 조회
+        cur.execute("""
+            SELECT m.magic_id, m.magic_name, p.name, p.id, s.attack_power,
+                   mn.content, mn.score
+            FROM Magic m
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Enrollment e ON m.magic_id = e.course_id
+            JOIN Student s ON e.student_id = s.student_id
+            JOIN Person p ON s.student_id = p.id
+            LEFT JOIN Magic_NSentence mn ON m.magic_id = mn.magic_id 
+                AND e.student_id = mn.student_id
+            WHERE m.creator_id = %s
+            ORDER BY m.magic_name, p.name
+        """, (session['user_id'],))
+        
+        students = cur.fetchall()
+        return render_template('professor/grade.html', students=students)
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/professor/submit_grade', methods=['POST'])
+@login_required
+def submit_grade():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
+    
+    magic_id = request.form.get('magic_id')
+    student_id = request.form.get('student_id')
+    score = int(request.form.get('score'))
+    
+    if score < 0 or score > 100:
+        return jsonify({'success': False, 'message': '성적은 0-100 사이여야 합니다.'})
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 성적 부여
+        cur.execute("""
+            UPDATE Magic_NSentence
+            SET score = %s
+            WHERE magic_id = %s AND student_id = %s
+        """, (score, magic_id, student_id))
+        
+        # 학생 공격력 증가 (성적에 비례)
+        attack_increase = score // 10  # 예: 90점이면 9, 80점이면 8
+        cur.execute("""
+            UPDATE Student
+            SET attack_power = attack_power + %s
+            WHERE student_id = %s
+        """, (attack_increase, student_id))
+        
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f'성적이 부여되었습니다. 학생의 공격력이 {attack_increase} 증가했습니다.'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+
+
 
 if __name__ == "__main__":
     scheduler.start()

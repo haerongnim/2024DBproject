@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>마법 연구실</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .research-container { 
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #4CAF50; color: white; }
+        .btn-success { background-color: #2196F3; color: white; }
+        .form-group { margin-bottom: 15px; }
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .mb-4 { margin-bottom: 20px; }
+        .ml-2 { margin-left: 10px; }
+    </style>
+</head>
+<body>
+    <h2>마법 연구실</h2>
+
+    <div class="research-container">
+        <div id="research-controls" class="mb-4">
+            <button id="researchBtn" class="btn btn-primary" onclick="attemptResearch()">마법 연구 시도</button>
+            <span id="cooldown" class="ml-2"></span>
+        </div>
+
+        <div id="magic-creation" style="display: none;">
+            <h3>새로운 마법 생성</h3>
+            <form id="magicForm" onsubmit="createMagic(event)">
+                <div class="form-group">
+                    <label>마법 이름 (<span id="nameLength"></span>글자)</label>
+                    <input type="text" id="magicName" class="form-control" required>
+                </div>
+                <div class="form-group">
+                    <label>수강 정원</label>
+                    <input type="number" id="capacity" class="form-control" value="30" min="1" max="100" required>
+                </div>
+                <button type="submit" class="btn btn-success">마법 생성</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let cooldownTimer;
+        let requiredLength;
+
+        function attemptResearch() {
+            const btn = document.getElementById('researchBtn');
+            btn.disabled = true;
+            
+            fetch('/professor/research/attempt', {
+                method: 'POST'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('magic-creation').style.display = 'block';
+                    requiredLength = data.name_length;
+                    document.getElementById('nameLength').textContent = requiredLength;
+                }
+                alert(data.message);
+                startCooldown();
+            });
+        }
+
+        function startCooldown() {
+            let seconds = 1;// 수정하기
+            const cooldownSpan = document.getElementById('cooldown');
+            const btn = document.getElementById('researchBtn');
+            
+            cooldownTimer = setInterval(() => {
+                cooldownSpan.textContent = `(${seconds}초 후 다시 시도 가능)`;
+                seconds--;
+                
+                if (seconds < 0) {
+                    clearInterval(cooldownTimer);
+                    btn.disabled = false;
+                    cooldownSpan.textContent = '';
+                }
+            }, 1000);
+        }
+
+        function createMagic(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('magicName').value;
+            if (name.length !== requiredLength) {
+                alert(`마법 이름은 ${requiredLength}글자여야 합니다.`);
+                return;
+            }
+            
+            const capacity = document.getElementById('capacity').value;
+            
+            fetch('/professor/create_magic', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `magic_name=${encodeURIComponent(name)}&capacity=${capacity}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    document.getElementById('magic-creation').style.display = 'none';
+                    document.getElementById('magicForm').reset();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

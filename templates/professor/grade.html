@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>학생 성적 관리</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .card { 
+            border: 1px solid #ddd; 
+            border-radius: 5px; 
+            margin-bottom: 15px;
+            padding: 15px;
+        }
+        .card-title { margin-top: 0; }
+        .student-info { margin-top: 10px; }
+        .n-sentence { margin: 10px 0; }
+        .grade-form { margin-top: 15px; }
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .btn-primary { background-color: #4CAF50; color: white; }
+        .form-control {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+        }
+        .d-inline-block { display: inline-block; }
+        .w-auto { width: auto; }
+        .mb-3 { margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <h2>학생 성적 관리</h2>
+
+    <div class="students-list">
+        {% for magic_id, magic_name, student_name, student_id, attack_power, content, score in students %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ magic_name }}</h5>
+                <div class="student-info">
+                    <p>
+                        학생: {{ student_name }} (ID: {{ student_id }})<br>
+                        공격력: {{ attack_power }}
+                    </p>
+                    <div class="n-sentence">
+                        <h6>N행시:</h6>
+                        <p>{{ content if content else '미제출' }}</p>
+                    </div>
+                    <div class="grade-form">
+                        <label>성적:</label>
+                        <input type="number" 
+                               id="score-{{ magic_id }}-{{ student_id }}" 
+                               value="{{ score if score else '' }}" 
+                               min="0" 
+                               max="100" 
+                               class="form-control d-inline-block w-auto">
+                        <button class="btn btn-primary" 
+                                onclick="submitGrade({{ magic_id }}, {{ student_id }})">
+                            성적 부여
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function submitGrade(magicId, studentId) {
+            const score = document.getElementById(`score-${magicId}-${studentId}`).value;
+            
+            fetch('/professor/submit_grade', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                body: `magic_id=${magicId}&student_id=${studentId}&score=${score}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                alert(data.message);
+                if (data.success) {
+                    location.reload();
+                }
+            });
+        }
+    </script>
+</body>
+</html>
