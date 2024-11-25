@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>회원가입</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; }
+        button { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        .messages { color: red; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+    <h2>회원가입</h2>
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="messages">
+                {{ messages[0] }}
+            </div>
+        {% endif %}
+    {% endwith %}
+    <form method="POST">
+        <div class="form-group">
+            <label>이름:</label>
+            <input type="text" name="name" required>
+        </div>
+        <div class="form-group">
+            <label>이메일:</label>
+            <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+            <label>비밀번호:</label>
+            <input type="password" name="password" required>
+        </div>
+        <div class="form-group">
+            <label>역할:</label>
+            <select name="role" required>
+                <option value="student">학생</option>
+                <option value="professor">교수</option>
+                <option value="villain">빌런</option>
+                <option value="muggle">머글</option>
+            </select>
+        </div>
+        <button type="submit">가입하기</button>
+    </form>
+    <p>이미 계정이 있으신가요? <a href="{{ url_for('login') }}">로그인</a></p>
+</body>
+</html>
