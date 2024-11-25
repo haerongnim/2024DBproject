@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>물건 거래소</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .items-container { margin-top: 20px; }
+        .item-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .price { color: green; font-weight: bold; }
+        .price.up { color: red; }
+        .price.down { color: blue; }
+        .cannot-buy { opacity: 0.5; }
+        .money-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .buy-form {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        input[type="number"] {
+            width: 80px;
+            padding: 5px;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+    <script>
+        // 실시간 가격 업데이트
+        function updatePrices() {
+            fetch('/api/items/prices')
+                .then(response => response.json())
+                .then(items => {
+                    items.forEach(item => {
+                        const priceElement = document.getElementById(`price-${item.item_id}`);
+                        if (priceElement) {
+                            const oldPrice = parseFloat(priceElement.dataset.price);
+                            const newPrice = parseFloat(item.price.toFixed(2));
+                            
+                            // 먼저 모든 색상 클래스 제거하고 기본 색상으로 설정
+                            priceElement.classList.remove('up', 'down');
+                            
+                            // 가격 변동에 따른 스타일 적용
+                            if (newPrice > oldPrice) {
+                                priceElement.classList.add('up');
+                            } else if (newPrice < oldPrice) {
+                                priceElement.classList.add('down');
+                            }
+                            
+                            priceElement.textContent = `${newPrice}G`;
+                            priceElement.dataset.price = newPrice;
+
+                            // 2초 후에 기본 색상으로 돌아가기
+                            setTimeout(() => {
+                                priceElement.classList.remove('up', 'down');
+                            }, 2000);
+                        }
+                    });
+                })
+                .catch(error => console.error('가격 업데이트 중 오류:', error));
+        }
+
+        // 페이지 로드 시 즉시 한 번 실행
+        updatePrices();
+
+        // 10초마다 가격 업데이트
+        setInterval(updatePrices, 10000);
+
+        function handleBuy(form) {
+            const itemId = form.getAttribute('data-item-id');
+            const amount = document.getElementById(`amount-${itemId}`).value;
+            
+            if (amount <= 0) {
+                alert('올바른 수량을 입력하세요.');
+                return;
+            }
+            
+            fetch(`/muggle/buy_item/${itemId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `amount=${amount}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="money-status">
+        💰 보유금액: {{ money }}G
+    </div>
+    
+    <h2>물건 거래소</h2>
+    <div class="items-container">
+        {% for item in items %}
+            <div class="item-card {% if not item[3] %}cannot-buy{% endif %}">
+                <div class="item-info">
+                    <h3>{{ item[1] }}</h3>
+                    <span class="price" id="price-{{ item[0] }}" data-price="{{ item[2] }}">
+                        {{ item[2] }}G
+                    </span>
+                </div>
+                {% if item[3] %}
+                    <form class="buy-form" data-item-id="{{ item[0] }}" onsubmit="event.preventDefault(); handleBuy(this)">
+                        <input type="number" id="amount-{{ item[0] }}" min="1" value="1">
+                        <button type="submit">구매하기</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    
+    <p><a href="{{ url_for('view_my_items') }}">내 물건 목록</a></p>
+    <p><a href="{{ url_for('home') }}">홈으로 돌아가기</a></p>
+</body>
+</html> 

@@ -4,30 +4,153 @@
     <title>홈</title>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
-        .header { display: flex; justify-content: space-between; align-items: center; }
-        .logout { padding: 5px 10px; background-color: #f44336; color: white; text-decoration: none; border-radius: 3px; }
+        .header { 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .logout { 
+            padding: 5px 10px; 
+            background-color: #f44336; 
+            color: white; 
+            text-decoration: none; 
+            border-radius: 3px; 
+        }
+        .menu-container {
+            border: 1px solid #ddd;
+            padding: 20px;
+            border-radius: 5px;
+        }
+        .menu-item {
+            margin: 10px 0;
+        }
+        .menu-link {
+            display: block;
+            padding: 10px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            text-align: center;
+        }
+        .menu-link:hover {
+            background-color: #45a049;
+        }
+        .role-badge {
+            display: inline-block;
+            padding: 5px 10px;
+            background-color: #2196F3;
+            color: white;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        .status-info {
+            margin-top: 10px;
+            display: flex;
+            gap: 20px;
+        }
+        .status-item {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+        .buy-heart {
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        .buy-heart:hover {
+            background-color: #45a049;
+        }
     </style>
 </head>
 <body>
     <div class="header">
-        <h2>안녕하세요! {{ username }}님 환영합니다!</h2>
+        <div>
+            <h2>안녕하세요! {{ username }}님</h2>
+            <span class="role-badge">{{ role }}</span>
+            <div class="status-info">
+                <span class="status-item heart">❤️ {{ heart }}</span>
+                {% if role == 'Muggle' %}
+                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
+                    <span class="status-item money">💰 {{ money }}G</span>
+                {% elif role in ['Student', 'Villain'] %}
+                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
+                {% endif %}
+            </div>
+            {% if role != 'Professor' %}
+                <button onclick="buyHeart()" class="buy-heart">
+                    {% if role == 'Muggle' %}
+                        생명력 구매 (1000G)
+                    {% else %}
+                        생명력 구매 (공격력 5 소모)
+                    {% endif %}
+                </button>
+            {% endif %}
+        </div>
         <a href="{{ url_for('logout') }}" class="logout">로그아웃</a>
     </div>
-    <p>당신의 역할: {{ role }}</p>
     
-    <!-- 역할별 메뉴 표시 -->
-    {% if role == 'Student' %}
-        <h3>학생 메뉴</h3>
-        <!-- 학생용 메뉴 추가 -->
-    {% elif role == 'Professor' %}
-        <h3>교수 메뉴</h3>
-        <!-- 교수용 메뉴 추가 -->
-    {% elif role == 'Villain' %}
-        <h3>빌런 메뉴</h3>
-        <!-- 빌런용 메뉴 추가 -->
-    {% elif role == 'Muggle' %}
-        <h3>머글 메뉴</h3>
-        <!-- 머글용 메뉴 추가 -->
-    {% endif %}
+    <div class="menu-container">
+        {% if role == 'Muggle' %}
+            <h3>머글 메뉴</h3>
+            <div class="menu-item">
+                <a href="{{ url_for('view_items') }}" class="menu-link">
+                    물건 거래소
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_my_items') }}" class="menu-link">
+                    내 물건 목록
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_magic_shop') }}" class="menu-link">
+                    마법 상점
+                </a>
+            </div>
+        {% elif role == 'Student' %}
+            <h3>학생 메뉴</h3>
+            <!-- 학생용 메뉴 항목들 -->
+        {% elif role == 'Professor' %}
+            <h3>교수 메뉴</h3>
+            <!-- 교수용 메뉴 항목들 -->
+        {% elif role == 'Villain' %}
+            <h3>빌런 메뉴</h3>
+            <div class="menu-item">
+                <a href="{{ url_for('villain_games') }}" class="menu-link">
+                    강해지기
+                </a>
+            </div>
+        {% endif %}
+        {% if role in ['Student', 'Villain', 'Muggle'] %}
+            <div class="menu-item">
+                <a href="{{ url_for('battle_list') }}" class="menu-link">
+                    ⚔️ 싸우기
+                </a>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        function buyHeart() {
+            fetch('/buy_heart', {
+                method: 'POST',
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+    </script>
 </body>
-</html> 
+</html>
