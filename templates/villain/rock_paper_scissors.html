@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>가위바위보</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; text-align: center; }
+        .game-container {
+            margin-top: 30px;
+        }
+        .choices {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        .choice {
+            font-size: 2.5em;
+            padding: 20px 30px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background-color: white;
+        }
+        .choice:hover {
+            transform: scale(1.1);
+            border-color: #3498db;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .choice:active {
+            transform: scale(0.95);
+        }
+        .result {
+            margin-top: 20px;
+            font-size: 1.5em;
+            min-height: 100px;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #3498db;
+            text-decoration: none;
+            font-size: 1.1em;
+        }
+        .win { color: #2ecc71; }
+        .lose { color: #e74c3c; }
+        .draw { color: #f39c12; }
+        
+        /* 애니메이션 효과 */
+        @keyframes bounce {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+            100% { transform: scale(1); }
+        }
+        .bounce {
+            animation: bounce 0.5s;
+        }
+    </style>
+</head>
+<body>
+    <h2>가위바위보 게임</h2>
+    <div class="game-container">
+        <div class="choices">
+            <div class="choice" onclick="play(this, 'rock')">✊</div>
+            <div class="choice" onclick="play(this, 'scissors')">✌️</div>
+            <div class="choice" onclick="play(this, 'paper')">✋</div>
+        </div>
+        <div class="result" id="result"></div>
+    </div>
+    
+    <a href="{{ url_for('villain_games') }}" class="back-link">게임 목록으로 돌아가기</a>
+
+    <script>
+        let isPlaying = false;
+
+        function play(element, playerChoice) {
+            if (isPlaying) return;
+            isPlaying = true;
+
+            // 클릭한 버튼 효과
+            element.classList.add('bounce');
+            setTimeout(() => element.classList.remove('bounce'), 500);
+
+            fetch('/villain/play_rps', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    choice: playerChoice
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = data.message;
+                
+                // 결과에 따른 색상 적용
+                if (data.message.includes('승리')) {
+                    resultDiv.className = 'result win';
+                    setTimeout(() => {
+                        alert('승리! 공격력이 3 증가했습니다!');
+                        window.location.href = "{{ url_for('villain_games') }}";
+                    }, 800);
+                } else if (data.message.includes('패배')) {
+                    resultDiv.className = 'result lose';
+                } else {
+                    resultDiv.className = 'result draw';
+                }
+                
+                isPlaying = false;
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                isPlaying = false;
+            });
+        }
+    </script>
+</body>
+</html> 

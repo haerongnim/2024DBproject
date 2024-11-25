@@ -428,7 +428,7 @@ def delete_all_data():
 
 if __name__ == '__main__':
     #create_tables()
-    insert_test_data()
+    #insert_test_data()
     #view_test_data()
     #delete_all_data()
     #drop_all_tables()

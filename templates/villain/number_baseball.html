@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>숫자야구</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            max-width: 800px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background-color: #f0f2f5;
+            color: #333;
+        }
+        .game-container {
+            display: flex;
+            gap: 20px;
+        }
+        .scoreboard {
+            flex: 1;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .timer-bar {
+            width: 100%;
+            height: 8px;
+            background-color: #e1e4e8;
+            margin-bottom: 20px;
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        .timer-progress {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            background-color: #4CAF50;
+            transition: width 0.1s linear;
+            border-radius: 10px;
+        }
+        .input-area {
+            margin-top: 20px;
+            text-align: center;
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .number-input {
+            width: 200px;
+            padding: 12px;
+            font-size: 1.5em;
+            background-color: #f8f9fa;
+            color: #333;
+            border: 2px solid #e1e4e8;
+            border-radius: 8px;
+            text-align: center;
+            letter-spacing: 8px;
+            transition: all 0.3s ease;
+        }
+        .number-input:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76,175,80,0.2);
+        }
+        .submit-btn {
+            margin-top: 15px;
+            padding: 12px 25px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            transition: background-color 0.3s ease;
+        }
+        .submit-btn:hover {
+            background-color: #45a049;
+        }
+        .history-row {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            font-family: monospace;
+            font-size: 1.2em;
+            padding: 8px;
+            border-radius: 5px;
+            transition: background-color 0.3s ease;
+        }
+        .history-row:hover {
+            background-color: #f8f9fa;
+        }
+        .turn-number {
+            width: 30px;
+            color: #666;
+            font-weight: bold;
+        }
+        .guess-number {
+            width: 100px;
+            margin: 0 15px;
+            color: #2c3e50;
+        }
+        .indicators {
+            display: flex;
+            gap: 6px;
+        }
+        .indicator {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background-color: #e1e4e8;
+            transition: background-color 0.3s ease;
+        }
+        .strike { 
+            background-color: #4CAF50;
+            box-shadow: 0 0 5px rgba(76,175,80,0.5);
+        }
+        .ball { 
+            background-color: #FFC107;
+            box-shadow: 0 0 5px rgba(255,193,7,0.5);
+        }
+        .count-display {
+            margin-left: 15px;
+            color: #666;
+            font-weight: bold;
+        }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #4CAF50;
+            text-decoration: none;
+            font-weight: bold;
+            transition: color 0.3s ease;
+        }
+        .back-link:hover {
+            color: #45a049;
+        }
+        h2 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .error-message {
+            color: #e74c3c;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <h2>⚾ 숫자야구</h2>
+    <div class="timer-bar">
+        <div class="timer-progress" id="timer"></div>
+    </div>
+    
+    <div class="game-container">
+        <div class="scoreboard">
+            <div id="history"></div>
+        </div>
+        
+        <div class="input-area">
+            <input type="text" id="guess" class="number-input" maxlength="4" pattern="\d*">
+            <button onclick="submitGuess()" class="submit-btn">도전!</button>
+            <p id="message"></p>
+        </div>
+    </div>
+    
+    <a href="{{ url_for('villain_games') }}" class="back-link">게임 목록으로 돌아가기</a>
+
+    <script>
+        let answer = '';
+        let currentTurn = 1;
+        let timerInterval;
+        const TIMER_DURATION = 15; // 15초
+        
+        // 게임 초기화
+        function initGame() {
+            // 중복없는 4자리 숫자 생성
+            const numbers = Array.from({length: 10}, (_, i) => i);
+            answer = '';
+            for(let i = 0; i < 4; i++) {
+                const idx = Math.floor(Math.random() * numbers.length);
+                answer += numbers.splice(idx, 1);
+            }
+            console.log('Answer:', answer); // 디버깅용
+            
+            // 히스토리 초기화
+            const historyDiv = document.getElementById('history');
+            historyDiv.innerHTML = '';
+            for(let i = 1; i <= 9; i++) {
+                historyDiv.innerHTML += `
+                    <div class="history-row">
+                        <span class="turn-number">${i}</span>
+                        <span class="guess-number" id="guess${i}">----</span>
+                        <div class="indicators">
+                            ${Array(4).fill('<div class="indicator"></div>').join('')}
+                        </div>
+                        <span class="count-display" id="count${i}"></span>
+                    </div>
+                `;
+            }
+            
+            startTimer();
+        }
+        
+        // 타이머 시작
+        function startTimer() {
+            let timeLeft = TIMER_DURATION;
+            const timerEl = document.getElementById('timer');
+            
+            clearInterval(timerInterval);
+            timerEl.style.width = '100%';
+            
+            timerInterval = setInterval(() => {
+                timeLeft -= 0.1;
+                const percentage = Math.max((timeLeft / TIMER_DURATION) * 100, 0);
+                timerEl.style.width = `${percentage}%`;
+                
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    handleTimeout();
+                }
+            }, 100);
+        }
+        
+        // 타임아웃 처리
+        function handleTimeout() {
+            document.getElementById(`guess${currentTurn}`).textContent = '시간초과';
+            document.getElementById('guess').value = ''; // 입력 필드 초기화
+            currentTurn++;
+            if (currentTurn > 9) {
+                endGame(false);
+            } else {
+                startTimer();
+            }
+        }
+        
+        // 추측 제출
+        function submitGuess() {
+            const guess = document.getElementById('guess').value;
+            
+            // 입력값 검증
+            if (!/^\d{4}$/.test(guess)) {
+                alert('4자리 숫자를 입력하세요!');
+                document.getElementById('guess').value = '';
+                return;
+            }
+            
+            if (new Set(guess).size !== 4) {
+                alert('서로 다른 숫자를 입력하세요!');
+                document.getElementById('guess').value = '';
+                return;
+            }
+            
+            // 타이머 중지 및 결과 처리
+            clearInterval(timerInterval);
+            const result = checkGuess(guess);
+            updateHistory(guess, result);
+            
+            if (result.strike === 4) {
+                endGame(true);
+            } else {
+                currentTurn++;
+                if (currentTurn > 9) {
+                    endGame(false);
+                } else {
+                    document.getElementById('guess').value = '';
+                    startTimer();
+                }
+            }
+        }
+        
+        // 추측 확인
+        function checkGuess(guess) {
+            let strike = 0;
+            let ball = 0;
+            
+            for (let i = 0; i < 4; i++) {
+                if (guess[i] === answer[i]) {
+                    strike++;
+                } else if (answer.includes(guess[i])) {
+                    ball++;
+                }
+            }
+            
+            return { strike, ball };
+        }
+        
+        // 히스토리 업데이트
+        function updateHistory(guess, result) {
+            const guessEl = document.getElementById(`guess${currentTurn}`);
+            const countEl = document.getElementById(`count${currentTurn}`);
+            const indicators = guessEl.nextElementSibling.children;
+            
+            guessEl.textContent = guess;
+            countEl.textContent = `${result.strike}S ${result.ball}B`;
+            
+            // 인디케이터 업데이트
+            for (let i = 0; i < 4; i++) {
+                if (i < result.strike) {
+                    indicators[i].className = 'indicator strike';
+                } else if (i < result.strike + result.ball) {
+                    indicators[i].className = 'indicator ball';
+                }
+            }
+        }
+        
+        // 게임 종료
+        function endGame(isWin) {
+            clearInterval(timerInterval);
+            if (isWin) {
+                fetch('/villain/complete_baseball', {
+                    method: 'POST'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert('승리! 공격력이 5 증가했습니다!');
+                    window.location.href = "{{ url_for('villain_games') }}";
+                });
+            } else {
+                alert(`게임 오버! 정답은 ${answer}였습니다.`);
+                window.location.href = "{{ url_for('villain_games') }}";
+            }
+        }
+        
+        // 입력 필드의 이벤트 리스너 수정
+        document.getElementById('guess').addEventListener('input', function(e) {
+            // 숫자만 입력 가능하도록
+            this.value = this.value.replace(/[^0-9]/g, '');
+            
+            // 4자리 제한
+            if (this.value.length > 4) {
+                this.value = this.value.slice(0, 4);
+            }
+        });
+
+        document.getElementById('guess').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // 폼 제출 방지
+                submitGuess();
+            }
+        });
+        
+        // 게임 시작
+        initGame();
+    </script>
+</body>
+</html> 
