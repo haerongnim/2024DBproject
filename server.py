@@ -7,8 +7,16 @@ from functools import wraps
 import sys
 from apscheduler.schedulers.background import BackgroundScheduler
 import random
+import json
+#from openai import OpenAI
 
 load_dotenv()
+
+# OpenAI 클라이언트 초기화
+#client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+
+app = Flask(__name__)
+app.secret_key = os.getenv('SECRET_KEY')
 
 # Windows 콘솔에서 한글 출력을 위한 설정
 if sys.platform == 'win32':
@@ -32,12 +40,6 @@ def get_db_connection():
         host=DB_HOST, # 127.0.0.1 과 같음
         port=DB_PORT
     )
-
-
-app = Flask(__name__)
-app.secret_key = os.getenv('SECRET_KEY')
-
-
 
 
 # 로그인 필요 데코레이터
@@ -789,6 +791,42 @@ QUIZ_DATABASE = [
         "correct_answer": 3
     }
 ]
+
+
+def generate_quiz():
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[{
+                "role": "system",
+                "content": """상식 퀴즈를 생성해주세요. 
+                다음 형식의 JSON으로 응답해주세요:
+                {
+                    "question": "퀴즈 질문",
+                    "options": ["보기1", "보기2", "보기3", "보기4"],
+                    "correct_answer": 정답의인덱스(0-3),
+                    "explanation": "정답에 대한 설명"
+                }
+                
+                퀴즈는 일반상식, 과학, 역사, 문화 등 다양한 분야에서 출제해주세요.
+                난이도는 중간 정도로 해주세요."""
+            }],
+            temperature=0.7
+        )
+        
+        # API 응답에서 JSON 추출
+        quiz_data = json.loads(response.choices[0].message.content)
+        return quiz_data
+        
+    except Exception as e:
+        print(f"퀴즈 생성 중 오류 발생: {e}")
+        # 오류 발생 시 기본 퀴즈 반환
+        return {
+            "question": "태양계에서 가장 큰 행성은?",
+            "options": ["화성", "목성", "토성", "금성"],
+            "correct_answer": 1,
+            "explanation": "목성은 태양계에서 가장 큰 행성입니다."
+        }
 
 @app.route('/villain/quiz_game')
 @login_required

@@ -75,7 +75,7 @@
                     <div class="creator">🧙‍♂️ 제작자: {{ magic[5] if magic[5] else '알 수 없음' }}</div>
                 </div>
                 {% if magic[4] %}
-                    <button onclick="buyMagic({{ magic[0] }})">구매하기</button>
+                    <button onclick="buyMagic('{{ magic[0] }}')">구매하기</button>
                 {% endif %}
             </div>
         {% endfor %}

@@ -74,12 +74,12 @@
             <h2>안녕하세요! {{ username }}님</h2>
             <span class="role-badge">{{ role }}</span>
             <div class="status-info">
-                <span class="status-item heart">❤️ {{ heart }}</span>
+                {% if role != 'Professor' %}
+                    <span class="status-item heart">❤️ {{ heart }}</span>
+                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
+                {% endif %}
                 {% if role == 'Muggle' %}
-                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
                     <span class="status-item money">💰 {{ money }}G</span>
-                {% elif role in ['Student', 'Villain'] %}
-                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
                 {% endif %}
             </div>
             {% if role != 'Professor' %}
