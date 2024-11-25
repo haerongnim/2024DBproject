@@ -115,10 +115,23 @@
             </div>
         {% elif role == 'Student' %}
             <h3>학생 메뉴</h3>
-            <!-- 학생용 메뉴 항목들 -->
+            <div class="menu-item">
+                <a href="{{ url_for('view_courses') }}" class="menu-link">
+                    마법 수강신청
+                </a>
+            </div>
         {% elif role == 'Professor' %}
             <h3>교수 메뉴</h3>
-            <!-- 교수용 메뉴 항목들 -->
+            <div class="menu-item">
+                <a href="{{ url_for('magic_research') }}" class="menu-link">
+                    🔮 마법 연구
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_students') }}" class="menu-link">
+                    📚 학생 성적 관리
+                </a>
+            </div>
         {% elif role == 'Villain' %}
             <h3>빌런 메뉴</h3>
             <div class="menu-item">
