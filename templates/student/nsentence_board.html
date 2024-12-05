@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>N행시 게시판</h2>
+    
+    <div class="mb-3">
+        <label>강좌 선택:</label>
+        <select id="courseSelect" class="form-select" onchange="updateCourse(this.value)">
+            <option value="">전체 보기</option>
+            {% for magic_id, magic_name in magic_courses %}
+                <option value="{{ magic_id }}" {% if selected_course == magic_id %}selected{% endif %}>
+                    {{ magic_name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="nsentence-list">
+        {% for nsentence in nsentences %}
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">{{ nsentence[1] }}</h5>
+                <h6 class="card-subtitle mb-2 text-muted">작성자: {{ nsentence[2] }}</h6>
+                <p class="card-text">
+                    N행시:<br>
+                    {{ nsentence[3] }}
+                </p>
+                {% if nsentence[4] is not none %}
+                    <div class="score-badge">
+                        점수: {{ nsentence[4] }}점
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<script>
+function updateCourse(magicId) {
+    window.location.href = "{{ url_for('view_nsentence_board') }}" + (magicId ? "?course=" + magicId : "");
+}
+</script>
+<a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
+{% endblock %} 

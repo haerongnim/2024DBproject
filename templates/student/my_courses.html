@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>내 수강 강좌</h2>
+    
+    <div class="mb-3">
+        <label>정렬:</label>
+        <select id="sortSelect" class="form-select" onchange="updateSort(this.value)">
+            <option value="magic_name_asc" {% if sort_by == 'magic_name_asc' %}selected{% endif %}>마법 이름 (오름차순)</option>
+            <option value="magic_name_desc" {% if sort_by == 'magic_name_desc' %}selected{% endif %}>마법 이름 (내림차순)</option>
+            <option value="professor_asc" {% if sort_by == 'professor_asc' %}selected{% endif %}>교수명 (오름차순)</option>
+            <option value="professor_desc" {% if sort_by == 'professor_desc' %}selected{% endif %}>교수명 (내림차순)</option>
+            <option value="score_asc" {% if sort_by == 'score_asc' %}selected{% endif %}>성적 (오름차순)</option>
+            <option value="score_desc" {% if sort_by == 'score_desc' %}selected{% endif %}>성적 (내림차순)</option>
+        </select>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>마법 이름</th>
+                    <th>마법 공격력</th>
+                    <th>담당 교수</th>
+                    <th>N행시</th>
+                    <th>점수</th>
+                    <th>학점</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for course in courses %}
+                <tr>
+                    <td>{{ course[1] }}</td>
+                    <td>{{ course[2] }}</td>
+                    <td>{{ course[3] }}</td>
+                    <td>{{ course[4] if course[4] else '미제출' }}</td>
+                    <td>{{ course[5] if course[5] is not none else '미평가' }}</td>
+                    <td>{{ course[6] }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function updateSort(value) {
+    window.location.href = "{{ url_for('view_my_courses') }}?sort=" + value;
+}
+</script>
+<a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
+{% endblock %} 
