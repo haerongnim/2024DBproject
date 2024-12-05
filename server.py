@@ -38,7 +38,8 @@ def get_db_connection():
         user=DB_USER ,
         password=DB_PASSWORD,
         host=DB_HOST, # 127.0.0.1 과 같음
-        port=DB_PORT
+        port=DB_PORT,
+        #options='-c client_encoding=UTF8'  # 인코딩 설정 추가
     )
 
 
@@ -66,6 +67,10 @@ def home():
                 WHERE muggle_id = %s
             """, (session['user_id'],))
             result = cur.fetchone()
+            if result is None:
+                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
+                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
+                return redirect(url_for('login'))
             context = {
                 'username': session['username'],
                 'role': role,
@@ -83,6 +88,10 @@ def home():
                 WHERE {id_column} = %s
             """, (session['user_id'],))
             result = cur.fetchone()
+            if result is None:
+                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
+                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
+                return redirect(url_for('login'))
             context = {
                 'username': session['username'],
                 'role': role,
@@ -683,7 +692,18 @@ def villain_games():
     if session.get('role') != 'Villain':
         flash('빌런만 접근할 수 있습니다.')
         return redirect(url_for('home'))
-    return render_template('villain/games.html')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("SELECT game_name, game_description, difficulty, reward, route_name FROM Game ORDER BY difficulty")
+        games = [dict(zip(['game_name', 'game_description', 'difficulty', 'reward', 'route_name'], row)) 
+                for row in cur.fetchall()]
+        return render_template('villain/games.html', games=games)
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/villain/rock_paper_scissors')
 @login_required
@@ -703,35 +723,52 @@ def play_rps():
     player_choice = data.get('choice')
     computer_choice = random.choice(['rock', 'scissors', 'paper'])
     
-    # 승패 결정 (미리 정의된 딕셔너리 사용)
-    RESULTS = {
-        'rock': {'rock': ('무승부!', False), 'scissors': ('승리!', True), 'paper': ('패배!', False)},
-        'scissors': {'rock': ('패배!', False), 'scissors': ('무승부!', False), 'paper': ('승리!', True)},
-        'paper': {'rock': ('승리!', True), 'scissors': ('패배!', False), 'paper': ('무승부!', False)}
-    }
+    conn = get_db_connection()
+    cur = conn.cursor()
     
-    EMOJIS = {'rock': '✊', 'scissors': '✌️', 'paper': '✋'}
-    
-    result, is_win = RESULTS[player_choice][computer_choice]
-    message = f"당신의 선택: {EMOJIS[player_choice]}<br>컴퓨터의 선택: {EMOJIS[computer_choice]}<br>{result}"
-    
-    if is_win:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        try:
+    try:
+        cur.execute("BEGIN")
+        
+        # 게임 ID 조회
+        cur.execute("""
+            SELECT game_id FROM Game WHERE route_name = 'rock_paper_scissors'
+        """)
+        game_id = cur.fetchone()[0]
+        
+        # 승패 결정
+        RESULTS = {
+            'rock': {'rock': ('무승부!', False), 'scissors': ('승리!', True), 'paper': ('패배!', False)},
+            'scissors': {'rock': ('패배!', False), 'scissors': ('무승부!', False), 'paper': ('승리!', True)},
+            'paper': {'rock': ('승리!', True), 'scissors': ('패배!', False), 'paper': ('무승부!', False)}
+        }
+        
+        EMOJIS = {'rock': '✊', 'scissors': '✌️', 'paper': '✋'}
+        
+        result, is_win = RESULTS[player_choice][computer_choice]
+        message = f"당신의 선택: {EMOJIS[player_choice]}<br>컴퓨터의 선택: {EMOJIS[computer_choice]}<br>{result}"
+        
+        # 게임 결과 기록
+        cur.execute("""
+            INSERT INTO GameAttempt (game_id, villain_id, result)
+            VALUES (%s, %s, %s)
+        """, (game_id, session['user_id'], is_win))
+        
+        if is_win:
             cur.execute("""
                 UPDATE Villain
                 SET attack_power = attack_power + 3
                 WHERE villain_id = %s
-                RETURNING attack_power
             """, (session['user_id'],))
-            conn.commit()
-            return jsonify({'success': True, 'message': message})
-        finally:
-            cur.close()
-            conn.close()
-    
-    return jsonify({'success': False, 'message': message})
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': message})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
 
 @app.route('/villain/number_baseball')
 @login_required
@@ -747,18 +784,40 @@ def complete_baseball():
     if session.get('role') != 'Villain':
         return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
     
+    data = request.get_json()
+    is_win = data.get('result', False)
+    
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
+        cur.execute("BEGIN")
+        
+        # 게임 ID 조회
         cur.execute("""
-            UPDATE Villain
-            SET attack_power = attack_power + 5
-            WHERE villain_id = %s
-            RETURNING attack_power
-        """, (session['user_id'],))
+            SELECT game_id FROM Game WHERE route_name = 'number_baseball'
+        """)
+        game_id = cur.fetchone()[0]
+        
+        # 게임 결과 기록
+        cur.execute("""
+            INSERT INTO GameAttempt (game_id, villain_id, result)
+            VALUES (%s, %s, %s)
+        """, (game_id, session['user_id'], is_win))
+        
+        if is_win:
+            cur.execute("""
+                UPDATE Villain
+                SET attack_power = attack_power + 5
+                WHERE villain_id = %s
+            """, (session['user_id'],))
+        
         conn.commit()
         return jsonify({'success': True})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
     finally:
         cur.close()
         conn.close()
@@ -776,7 +835,7 @@ QUIZ_DATABASE = [
         "correct_answer": 1
     },
     {
-        "question": "세계에��� 가장 긴 강은?",
+        "question": "세계에 가장 긴 강은?",
         "options": ["나일강", "아마존강", "양쯔강", "미시시피강"],
         "correct_answer": 0
     },
@@ -844,18 +903,40 @@ def complete_quiz():
     if session.get('role') != 'Villain':
         return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
     
+    data = request.get_json()
+    is_correct = data.get('result', False)
+    
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
+        cur.execute("BEGIN")
+        
+        # 게임 ID 조회
         cur.execute("""
-            UPDATE Villain
-            SET attack_power = attack_power + 7
-            WHERE villain_id = %s
-            RETURNING attack_power
-        """, (session['user_id'],))
+            SELECT game_id FROM Game WHERE route_name = 'quiz_game'
+        """)
+        game_id = cur.fetchone()[0]
+        
+        # 게임 결과 기록
+        cur.execute("""
+            INSERT INTO GameAttempt (game_id, villain_id, result)
+            VALUES (%s, %s, %s)
+        """, (game_id, session['user_id'], is_correct))
+        
+        if is_correct:
+            cur.execute("""
+                UPDATE Villain
+                SET attack_power = attack_power + 7
+                WHERE villain_id = %s
+            """, (session['user_id'],))
+        
         conn.commit()
         return jsonify({'success': True})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
     finally:
         cur.close()
         conn.close()
@@ -1357,8 +1438,80 @@ def submit_grade():
         cur.close()
         conn.close()
 
+@app.route('/rankings')
+@login_required
+def view_rankings():
+    role = session.get('role')
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        if role == 'Professor':
+            # 교수는 모든 랭킹을 볼 수 있음
+            cur.execute("""
+                SELECT p.name, 
+                       CASE 
+                           WHEN s.student_id IS NOT NULL THEN 'Student'
+                           WHEN v.villain_id IS NOT NULL THEN 'Villain'
+                           WHEN m.muggle_id IS NOT NULL THEN 'Muggle'
+                       END as role,
+                       COALESCE(s.attack_power, v.attack_power, m.attack_power) as attack_power
+                FROM Person p
+                LEFT JOIN Student s ON p.id = s.student_id
+                LEFT JOIN Villain v ON p.id = v.villain_id
+                LEFT JOIN Muggle m ON p.id = m.muggle_id
+                WHERE COALESCE(s.attack_power, v.attack_power, m.attack_power) IS NOT NULL
+                ORDER BY attack_power DESC
+            """)
+        else:
+            # 다른 역할은 자신의 역할에 해당하는 랭킹만 볼 수 있음
+            table_name = {'Student': 'Student', 'Villain': 'Villain', 'Muggle': 'Muggle'}[role]
+            id_column = f'{table_name.lower()}_id'
+            
+            cur.execute(f"""
+                SELECT p.name, t.attack_power
+                FROM {table_name} t
+                JOIN Person p ON t.{id_column} = p.id
+                ORDER BY t.attack_power DESC
+            """)
+        
+        rankings = [dict(zip(['name', 'role', 'attack_power'] if role == 'Professor' else 
+                           ['name', 'attack_power'], row))
+                   for row in cur.fetchall()]
+        
+        return render_template('rankings.html', rankings=rankings, role=role)
+    finally:
+        cur.close()
+        conn.close()
 
-
+@app.route('/villain/game_history')
+@login_required
+def view_game_history():
+    if session.get('role') != 'Villain':
+        flash('빌런만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT g.game_name, 
+                   COUNT(*) as total_attempts,
+                   SUM(CASE WHEN ga.result = true THEN 1 ELSE 0 END) as wins,
+                   MAX(ga.attempt_time) as last_attempt
+            FROM Game g
+            JOIN GameAttempt ga ON g.game_id = ga.game_id
+            WHERE ga.villain_id = %s
+            GROUP BY g.game_name
+            ORDER BY last_attempt DESC
+        """, (session['user_id'],))
+        
+        game_history = cur.fetchall()
+        return render_template('villain/game_history.html', game_history=game_history)
+    finally:
+        cur.close()
+        conn.close()
 
 if __name__ == "__main__":
     scheduler.start()

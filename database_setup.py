@@ -23,6 +23,10 @@ def get_db_connection():
 
 def create_tables():
     commands = [
+        # 트리거 제거
+        "DROP TRIGGER IF EXISTS check_players_trigger ON Match;",
+        "DROP FUNCTION IF EXISTS check_valid_players();",
+
         # Person 테이블
         """
         CREATE TABLE IF NOT EXISTS Person (
@@ -124,7 +128,11 @@ def create_tables():
         """
         CREATE TABLE IF NOT EXISTS Game (
             game_id SERIAL PRIMARY KEY,
-            game_name VARCHAR(100) NOT NULL
+            game_name VARCHAR(100) NOT NULL,
+            game_description TEXT NOT NULL,
+            difficulty INTEGER NOT NULL,  -- 1: 쉬움, 2: 보통, 3: 어려움
+            reward INTEGER NOT NULL,      -- 공격력 증가량
+            route_name VARCHAR(100) NOT NULL  -- Flask 라우트 이름 (예: 'rock_paper_scissors')
         )
         """,
         # GameAttempt 테이블
@@ -132,7 +140,6 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS GameAttempt (
             game_id INTEGER REFERENCES Game(game_id),
             villain_id INTEGER REFERENCES Villain(villain_id),
-            difficulty INTEGER NOT NULL,
             result BOOLEAN NOT NULL,
             attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             PRIMARY KEY (game_id, villain_id, attempt_time)
@@ -320,6 +327,14 @@ def insert_test_data():
             (%s, 50.00);
         """, (expelliarmus_id, lumos_id))
 
+        # Game 테이블에 기본 게임 데이터 삽입
+        cur.execute("""
+            INSERT INTO Game (game_name, game_description, difficulty, reward, route_name) VALUES
+            ('✌️ 가위바위보', '컴퓨터와 가위바위보 대결을 펼쳐보세요!', 1, 3, 'rock_paper_scissors'),
+            ('⚾ 숫자야구', '4자리 숫자를 맞추는 두뇌 게임에 도전하세요!', 2, 5, 'number_baseball'),
+            ('🎓 상식 퀴즈', '다양한 상식 문제를 풀어보세요!', 3, 7, 'quiz_game')
+        """)
+
         conn.commit()
         print("Test data inserted successfully")
         
@@ -428,8 +443,10 @@ def delete_all_data():
 
 if __name__ == '__main__':
     #create_tables()
-    #insert_test_data()
+    insert_test_data()
+    view_test_data()
+    #drop_all_tables()
     #view_test_data()
     #delete_all_data()
-    #drop_all_tables()
-    view_test_data()
+    
+    

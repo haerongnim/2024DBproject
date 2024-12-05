@@ -139,6 +139,11 @@
                     강해지기
                 </a>
             </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_game_history') }}" class="menu-link">
+                    🎮 게임 기록 보기
+                </a>
+            </div>
         {% endif %}
         {% if role in ['Student', 'Villain', 'Muggle'] %}
             <div class="menu-item">
@@ -147,6 +152,11 @@
                 </a>
             </div>
         {% endif %}
+        <div class="menu-item">
+            <a href="{{ url_for('view_rankings') }}" class="menu-link">
+                🏆 랭킹보기
+            </a>
+        </div>
     </div>
 
     <script>
