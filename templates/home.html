@@ -28,14 +28,14 @@
         .menu-link {
             display: block;
             padding: 10px;
-            background-color: #4CAF50;
+            background-color: #4e0061;
             color: white;
             text-decoration: none;
             border-radius: 3px;
             text-align: center;
         }
         .menu-link:hover {
-            background-color: #45a049;
+            background-color: #4e0061;
         }
         .role-badge {
             display: inline-block;
@@ -57,14 +57,14 @@
         .buy-heart {
             margin-top: 10px;
             padding: 10px 20px;
-            background-color: #4CAF50;
+            background-color: #4e0061;
             color: white;
             border: none;
             border-radius: 3px;
             cursor: pointer;
         }
         .buy-heart:hover {
-            background-color: #45a049;
+            background-color: #4e0061;
         }
     </style>
 </head>
@@ -118,6 +118,16 @@
             <div class="menu-item">
                 <a href="{{ url_for('view_courses') }}" class="menu-link">
                     마법 수강신청
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_my_courses') }}" class="menu-link">
+                    내 수강 강좌
+                </a>
+            </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_nsentence_board') }}" class="menu-link">
+                    📝 N행시 게시판
                 </a>
             </div>
         {% elif role == 'Professor' %}

@@ -481,7 +481,7 @@ def sell_item(item_id):
         
         total_earning = current_price * amount
         
-        # 머글의 돈 증가
+        # 글의 돈 증가
         cur.execute("""
             UPDATE Muggle
             SET money = money + %s
@@ -514,7 +514,7 @@ def sell_item(item_id):
         cur.close()
         conn.close()
 
-# 마법 상점 조회
+# 마법 상점 조���
 @app.route('/muggle/magic_shop')
 @login_required
 def view_magic_shop():
@@ -1258,14 +1258,20 @@ def submit_nsentence(magic_id):
     try:
         cur.execute("BEGIN")
         
-        # 수강 여부 확인
+        # 수강 여부와 기존 N행시 점수 확인
         cur.execute("""
-            SELECT 1 FROM Enrollment
-            WHERE course_id = %s AND student_id = %s
+            SELECT mn.score 
+            FROM Enrollment e
+            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
+            WHERE e.course_id = %s AND e.student_id = %s
         """, (magic_id, session['user_id']))
         
-        if not cur.fetchone():
+        result = cur.fetchone()
+        if not result:
             raise Exception("수강 중인 강의가 아닙니다.")
+        
+        if result[0] is not None:
+            raise Exception("이미 평가된 N행시는 수정할 수 없습니다.")
         
         # N행시 제출/수정
         cur.execute("""
@@ -1273,6 +1279,7 @@ def submit_nsentence(magic_id):
             VALUES (%s, %s, %s)
             ON CONFLICT (magic_id, student_id) 
             DO UPDATE SET content = EXCLUDED.content
+            WHERE Magic_NSentence.score IS NULL
         """, (magic_id, session['user_id'], content))
         
         conn.commit()
@@ -1281,6 +1288,64 @@ def submit_nsentence(magic_id):
     except Exception as e:
         conn.rollback()
         return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/student/my_courses')
+@login_required
+def view_my_courses():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    sort_by = request.args.get('sort', 'magic_name_asc')
+    
+    sort_conditions = {
+        'magic_name_asc': 'm.magic_name ASC',
+        'magic_name_desc': 'm.magic_name DESC',
+        'professor_asc': 'p.name ASC',
+        'professor_desc': 'p.name DESC',
+        'score_asc': 'COALESCE(mn.score, -1) ASC',
+        'score_desc': 'COALESCE(mn.score, -1) DESC'
+    }
+    
+    order_by = sort_conditions.get(sort_by, 'm.magic_name ASC')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                m.magic_id,
+                m.magic_name,
+                m.power as attack_power,
+                p.name AS professor_name,
+                mn.content AS nsentence,
+                mn.score,
+                CASE 
+                    WHEN mn.score >= 90 THEN 'A'
+                    WHEN mn.score >= 80 THEN 'B'
+                    WHEN mn.score >= 70 THEN 'C'
+                    WHEN mn.score >= 60 THEN 'D'
+                    WHEN mn.score IS NOT NULL THEN 'F'
+                    ELSE NULL
+                END AS grade
+            FROM Enrollment e
+            JOIN Magic m ON e.course_id = m.magic_id
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Professor pr ON c.instructor_id = pr.professor_id
+            JOIN Person p ON pr.professor_id = p.id
+            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
+            WHERE e.student_id = %s
+            ORDER BY """ + order_by, 
+            (session['user_id'],)
+        )
+        
+        courses = cur.fetchall()
+        return render_template('student/my_courses.html', courses=courses, sort_by=sort_by)
+        
     finally:
         cur.close()
         conn.close()
@@ -1410,15 +1475,30 @@ def submit_grade():
     try:
         cur.execute("BEGIN")
         
+        # 기존 성적 확인
+        cur.execute("""
+            SELECT score 
+            FROM Magic_NSentence
+            WHERE magic_id = %s AND student_id = %s
+        """, (magic_id, student_id))
+        
+        result = cur.fetchone()
+        if result and result[0] is not None:
+            raise Exception("이미 평가된 N행시입니다.")
+        
         # 성적 부여
         cur.execute("""
             UPDATE Magic_NSentence
             SET score = %s
             WHERE magic_id = %s AND student_id = %s
+            AND score IS NULL
         """, (score, magic_id, student_id))
         
+        if cur.rowcount == 0:
+            raise Exception("성적을 부여할 수 없습니다.")
+        
         # 학생 공격력 증가 (성적에 비례)
-        attack_increase = score // 10  # 예: 90점이면 9, 80점이면 8
+        attack_increase = score // 10
         cur.execute("""
             UPDATE Student
             SET attack_power = attack_power + %s
@@ -1515,5 +1595,5 @@ def view_game_history():
 
 if __name__ == "__main__":
     scheduler.start()
-    #initialize_items()  # 서버 시작 시 기본 아이템 추가
-    app.run(debug=True, host='0.0.0.0', port=5000)  # 서버 실행
+    initialize_items()  # 주석 해제
+    app.run(debug=True, host='0.0.0.0', port=5000)
