@@ -1593,6 +1593,67 @@ def view_game_history():
         cur.close()
         conn.close()
 
+@app.route('/student/nsentence_board')
+@login_required
+def view_nsentence_board():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    selected_course = request.args.get('course', type=int)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 학생이 수강한 강좌 목록
+        cur.execute("""
+            SELECT DISTINCT m.magic_id, m.magic_name
+            FROM Enrollment e
+            JOIN Magic m ON e.course_id = m.magic_id
+            WHERE e.student_id = %s
+            ORDER BY m.magic_name
+        """, (session['user_id'],))
+        magic_courses = cur.fetchall()
+        
+        # N행시 목록 조회
+        if selected_course:
+            cur.execute("""
+                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
+                FROM Magic_NSentence mn
+                JOIN Magic m ON mn.magic_id = m.magic_id
+                JOIN Person p ON mn.student_id = p.id
+                WHERE mn.magic_id = %s
+                AND EXISTS (
+                    SELECT 1 FROM Enrollment e 
+                    WHERE e.course_id = mn.magic_id 
+                    AND e.student_id = %s
+                )
+                ORDER BY mn.score DESC NULLS LAST, p.name
+            """, (selected_course, session['user_id']))
+        else:
+            cur.execute("""
+                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
+                FROM Magic_NSentence mn
+                JOIN Magic m ON mn.magic_id = m.magic_id
+                JOIN Person p ON mn.student_id = p.id
+                WHERE EXISTS (
+                    SELECT 1 FROM Enrollment e 
+                    WHERE e.course_id = mn.magic_id 
+                    AND e.student_id = %s
+                )
+                ORDER BY m.magic_name, mn.score DESC NULLS LAST, p.name
+            """, (session['user_id'],))
+        
+        nsentences = cur.fetchall()
+        return render_template('student/nsentence_board.html', 
+                             magic_courses=magic_courses,
+                             nsentences=nsentences,
+                             selected_course=selected_course)
+    finally:
+        cur.close()
+        conn.close()
+
 if __name__ == "__main__":
     scheduler.start()
     initialize_items()  # 주석 해제
