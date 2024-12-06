@@ -163,19 +163,24 @@
         document.getElementById('submitBtn').onclick = function() {
             clearInterval(timerInterval);
             
-            if (selectedOption === quizData.correct_answer) {
-                fetch('/villain/complete_quiz', {
-                    method: 'POST'
-                })
-                .then(response => response.json())
-                .then(data => {
+            const isCorrect = selectedOption === quizData.correct_answer;
+            
+            fetch('/villain/complete_quiz', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ result: isCorrect })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (isCorrect) {
                     alert('정답입니다! 공격력이 7 증가했습니다!');
-                    window.location.href = "{{ url_for('villain_games') }}";
-                });
-            } else {
-                alert('틀렸습니다! 정답은 ' + quizData.options[quizData.correct_answer] + ' 입니다.');
+                } else {
+                    alert('틀렸습니다! 정답은 ' + quizData.options[quizData.correct_answer] + ' 입니다.');
+                }
                 window.location.href = "{{ url_for('villain_games') }}";
-            }
+            });
         };
         
         initQuiz();

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>랭킹</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .ranking-container { margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #4CAF50; color: white; }
+        .search-container { margin-bottom: 20px; }
+        .search-input { padding: 8px; width: 200px; }
+        .sort-button {
+            padding: 5px 10px;
+            margin-left: 5px;
+            background-color: #2196F3;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        .role-filter {
+            padding: 8px;
+            margin-right: 10px;
+        }
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #f44336;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('home') }}" class="back-button">돌아가기</a>
+    <h2>랭킹</h2>
+    
+    <div class="search-container">
+        <input type="text" id="searchInput" class="search-input" placeholder="이름으로 검색...">
+        {% if role == 'Professor' %}
+        <select id="roleFilter" class="role-filter">
+            <option value="all">전체</option>
+            <option value="Student">학생</option>
+            <option value="Villain">빌런</option>
+            <option value="Muggle">머글</option>
+        </select>
+        {% endif %}
+        <button onclick="sortRankings('asc')" class="sort-button">▲ 오름차순</button>
+        <button onclick="sortRankings('desc')" class="sort-button">▼ 내림차순</button>
+    </div>
+
+    <div class="ranking-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>순위</th>
+                    <th>이름</th>
+                    {% if role == 'Professor' %}
+                    <th>역할</th>
+                    {% endif %}
+                    <th>공격력</th>
+                </tr>
+            </thead>
+            <tbody id="rankingTable">
+                {% for user in rankings %}
+                <tr>
+                    <td>{{ loop.index }}</td>
+                    <td>{{ user.name }}</td>
+                    {% if role == 'Professor' %}
+                    <td>{{ user.role }}</td>
+                    {% endif %}
+                    <td>{{ user.attack_power }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function filterTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter')?.value || '{{ role }}';
+            const rows = document.getElementById('rankingTable').getElementsByTagName('tr');
+
+            for (let row of rows) {
+                const nameCell = row.cells[1];
+                const roleCell = row.cells.length > 3 ? row.cells[2] : null;
+                const name = nameCell.textContent || nameCell.innerText;
+                
+                let showRow = name.toLowerCase().includes(filter);
+                if (roleFilter !== 'all' && roleCell) {
+                    showRow = showRow && (roleCell.textContent === roleFilter);
+                }
+                
+                row.style.display = showRow ? '' : 'none';
+            }
+        }
+
+        function sortRankings(order) {
+            const table = document.getElementById('rankingTable');
+            const rows = Array.from(table.getElementsByTagName('tr'));
+            
+            rows.sort((a, b) => {
+                const aRank = parseInt(a.cells[0].textContent);
+                const bRank = parseInt(b.cells[0].textContent);
+                
+                return order === 'asc' ? bRank - aRank : aRank - bRank;
+            });
+            
+            rows.forEach(row => {
+                table.appendChild(row);
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('keyup', filterTable);
+        if (document.getElementById('roleFilter')) {
+            document.getElementById('roleFilter').addEventListener('change', filterTable);
+        }
+    </script>
+</body>
+</html> 

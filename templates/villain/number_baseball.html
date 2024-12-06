@@ -312,7 +312,11 @@
             clearInterval(timerInterval);
             if (isWin) {
                 fetch('/villain/complete_baseball', {
-                    method: 'POST'
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ result: true })
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -320,8 +324,18 @@
                     window.location.href = "{{ url_for('villain_games') }}";
                 });
             } else {
-                alert(`게임 오버! 정답은 ${answer}였습니다.`);
-                window.location.href = "{{ url_for('villain_games') }}";
+                fetch('/villain/complete_baseball', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ result: false })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(`게임 오버! 정답은 ${answer}였습니다.`);
+                    window.location.href = "{{ url_for('villain_games') }}";
+                });
             }
         }
         

@@ -74,12 +74,12 @@
             <h2>안녕하세요! {{ username }}님</h2>
             <span class="role-badge">{{ role }}</span>
             <div class="status-info">
-                <span class="status-item heart">❤️ {{ heart }}</span>
+                {% if role != 'Professor' %}
+                    <span class="status-item heart">❤️ {{ heart }}</span>
+                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
+                {% endif %}
                 {% if role == 'Muggle' %}
-                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
                     <span class="status-item money">💰 {{ money }}G</span>
-                {% elif role in ['Student', 'Villain'] %}
-                    <span class="status-item attack">⚔️ {{ attack_power }}</span>
                 {% endif %}
             </div>
             {% if role != 'Professor' %}
@@ -149,6 +149,11 @@
                     강해지기
                 </a>
             </div>
+            <div class="menu-item">
+                <a href="{{ url_for('view_game_history') }}" class="menu-link">
+                    🎮 게임 기록 보기
+                </a>
+            </div>
         {% endif %}
         {% if role in ['Student', 'Villain', 'Muggle'] %}
             <div class="menu-item">
@@ -157,6 +162,11 @@
                 </a>
             </div>
         {% endif %}
+        <div class="menu-item">
+            <a href="{{ url_for('view_rankings') }}" class="menu-link">
+                🏆 랭킹보기
+            </a>
+        </div>
     </div>
 
     <script>

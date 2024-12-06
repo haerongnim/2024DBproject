@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>게임 기록</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .history-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        .history-table th, .history-table td {
+            padding: 10px;
+            border: 1px solid #ddd;
+            text-align: center;
+        }
+        .history-table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .history-table tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            text-decoration: none;
+            border-radius: 3px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('home') }}" class="back-button">← 돌아가기</a>
+    <h2>🎮 게임 기록</h2>
+    
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>게임 이름</th>
+                <th>총 시도 횟수</th>
+                <th>승리 횟수</th>
+                <th>승률</th>
+                <th>마지막 시도</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for game in game_history %}
+            <tr>
+                <td>{{ game[0] }}</td>
+                <td>{{ game[1] }}</td>
+                <td>{{ game[2] }}</td>
+                <td>{{ "%.1f"|format(game[2] / game[1] * 100) }}%</td>
+                <td>{{ game[3].strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</body>
+</html> 

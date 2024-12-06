@@ -48,32 +48,16 @@
 <body>
     <h2>게임 목록</h2>
     <div class="game-list">
-        <a href="{{ url_for('rock_paper_scissors') }}" class="game-card">
-            <div class="game-title">✌️ 가위바위보</div>
+        {% for game in games %}
+        <a href="{{ url_for(game.route_name) }}" class="game-card">
+            <div class="game-title">{{ game.game_name }}</div>
             <div class="game-info">
-                <span class="difficulty">난이도: ★☆☆</span>
-                <span class="reward">보상: 공격력 +3</span>
+                <span class="difficulty">난이도: {{ "★" * game.difficulty }}{{ "☆" * (3 - game.difficulty) }}</span>
+                <span class="reward">보상: 공격력 +{{ game.reward }}</span>
             </div>
-            <p>컴퓨터와 가위바위보 대결을 펼쳐보세요!</p>
+            <p>{{ game.game_description }}</p>
         </a>
-        
-        <a href="{{ url_for('number_baseball') }}" class="game-card">
-            <div class="game-title">⚾ 숫자야구</div>
-            <div class="game-info">
-                <span class="difficulty">난이도: ★★☆</span>
-                <span class="reward">보상: 공격력 +5</span>
-            </div>
-            <p>4자리 숫자를 맞추는 두뇌 게임에 도전하세요!</p>
-        </a>
-
-        <a href="{{ url_for('quiz_game') }}" class="game-card">
-            <div class="game-title">🎓 상식 퀴즈</div>
-            <div class="game-info">
-                <span class="difficulty">난이도: ★★★</span>
-                <span class="reward">보상: 공격력 +7</span>
-            </div>
-            <p>다양한 상식 문제를 풀어보세요!</p>
-        </a>
+        {% endfor %}
     </div>
     
     <a href="{{ url_for('home') }}" class="back-link">홈으로 돌아가기</a>
