@@ -10,6 +10,15 @@
 
 ## 1. .env 설정
 자신의 local 환경에 맞게 .env 파일을 수정하세요
+```
+DB_NAME="project"
+DB_USER="db_project"
+DB_PASSWORD="!db_project"
+DB_HOST="::1"
+DB_PORT="5432"
+
+SECRET_KEY=your_very_long_and_very_random_secret_key
+```
 
 ## 2. server.py 실행
 서버를 실행하고 127.0.0.1:5000 으로 접속하세요
