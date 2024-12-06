@@ -28,7 +28,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    {% if session['role'] == 'Student' %}
+                    {% if session['role'] == 'Student' and request.endpoint != 'view_my_courses' %}
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('view_my_courses') }}">내 수강 강좌</a>
                         </li>
