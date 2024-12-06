@@ -11,9 +11,9 @@
 ## 1. .env 설정
 자신의 local 환경에 맞게 .env 파일을 수정하세요
 ```dotenv
-DB_NAME="project"
-DB_USER="db_project"
-DB_PASSWORD="!db_project"
+DB_NAME="your db name"
+DB_USER="your user name"
+DB_PASSWORD="your passward"
 DB_HOST="::1"
 DB_PORT="5432"
 
