@@ -52,103 +52,6 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-@app.route('/')
-@login_required
-def home():
-    role = session.get('role')
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        if role == 'Muggle':
-            cur.execute("""
-                SELECT heart, attack_power, money 
-                FROM Muggle 
-                WHERE muggle_id = %s
-            """, (session['user_id'],))
-            result = cur.fetchone()
-            if result is None:
-                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
-                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
-                return redirect(url_for('login'))
-            context = {
-                'username': session['username'],
-                'role': role,
-                'heart': result[0],
-                'attack_power': result[1],
-                'money': result[2]
-            }
-        elif role in ['Student', 'Villain']:
-            table_name = {'Student': 'Student', 'Villain': 'Villain'}[role]
-            id_column = {'Student': 'student_id', 'Villain': 'villain_id'}[role]
-            
-            cur.execute(f"""
-                SELECT heart, attack_power 
-                FROM {table_name} 
-                WHERE {id_column} = %s
-            """, (session['user_id'],))
-            result = cur.fetchone()
-            if result is None:
-                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
-                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
-                return redirect(url_for('login'))
-            context = {
-                'username': session['username'],
-                'role': role,
-                'heart': result[0],
-                'attack_power': result[1]
-            }
-        else:
-            context = {
-                'username': session['username'],
-                'role': role
-            }
-        
-        return render_template('home.html', **context)
-    finally:
-        cur.close()
-        conn.close()
-    
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        email = request.form['email']
-        password = request.form['password']
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        # Person 테이블에서 사용자 확인
-        cur.execute("SELECT * FROM Person WHERE email = %s", (email,))
-        user = cur.fetchone()
-        
-        if user and check_password_hash(user[3], password):  # user[3]은 password 컬럼
-            session['user_id'] = user[0]  # id
-            session['username'] = user[1]  # name
-            
-            # 역할 확인 (Student, Professor, Villain, Muggle)
-            roles = ['Student', 'Professor', 'Villain', 'Muggle']
-            user_role = None
-            
-            for role in roles:
-                cur.execute(f"SELECT * FROM {role} WHERE {role.lower()}_id = %s", (user[0],))
-                if cur.fetchone():
-                    user_role = role
-                    break
-            
-            if user_role:
-                session['role'] = user_role
-                cur.close()
-                conn.close()
-                return redirect(url_for('home'))
-            
-        flash('잘못된 이메일 또는 비밀번호입니다.')
-        cur.close()
-        conn.close()
-    
-    return render_template('login.html')
-
 @app.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
@@ -205,412 +108,110 @@ def signup():
     
     return render_template('signup.html')
 
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        email = request.form['email']
+        password = request.form['password']
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        # Person 테이블에서 사용자 확인
+        cur.execute("SELECT * FROM Person WHERE email = %s", (email,))
+        user = cur.fetchone()
+        
+        if user and check_password_hash(user[3], password):  # user[3]은 password 컬럼
+            session['user_id'] = user[0]  # id
+            session['username'] = user[1]  # name
+            
+            # 역할 확인 (Student, Professor, Villain, Muggle)
+            roles = ['Student', 'Professor', 'Villain', 'Muggle']
+            user_role = None
+            
+            for role in roles:
+                cur.execute(f"SELECT * FROM {role} WHERE {role.lower()}_id = %s", (user[0],))
+                if cur.fetchone():
+                    user_role = role
+                    break
+            
+            if user_role:
+                session['role'] = user_role
+                cur.close()
+                conn.close()
+                return redirect(url_for('home'))
+            
+        flash('잘못된 이메일 또는 비밀번호입니다.')
+        cur.close()
+        conn.close()
+    
+    return render_template('login.html')
+
 @app.route('/logout')
 def logout():
     session.clear()
     return redirect(url_for('login'))
 
-######################## 머글 #############################
-# 머글 상태 조회
-@app.route('/muggle/status')
+############################# 홈 화면 #############################
+@app.route('/')
 @login_required
-def muggle_status():
-    if session.get('role') != 'Muggle':
-        flash('머글만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
+def home():
+    role = session.get('role')
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
-        # 머글 정보 조회
-        cur.execute("""
-            SELECT m.heart, m.attack_power, m.money 
-            FROM Muggle m 
-            WHERE m.muggle_id = %s
-        """, (session['user_id'],))
-        
-        muggle_info = cur.fetchone()
-        if not muggle_info:
-            flash('머글 정보를 찾을 수 없습니다.')
-            return redirect(url_for('home'))
-        
-        heart, attack_power, money = muggle_info
-        
-        return render_template('muggle/status.html', 
-                             heart=heart,
-                             attack_power=attack_power,
-                             money=money)
-                             
-    finally:
-        cur.close()
-        conn.close()
-
-# 물건 목록 조회
-@app.route('/muggle/items')
-@login_required
-def view_items():
-    if session.get('role') != 'Muggle':
-        flash('머글만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 현재 머글의 돈 조회
-        cur.execute("""
-            SELECT money 
-            FROM Muggle 
-            WHERE muggle_id = %s
-        """, (session['user_id'],))
-        
-        money = cur.fetchone()[0]
-        
-        # 모든 물건 목록 조회
-        cur.execute("""
-            SELECT i.item_id, i.item_name, i.current_price,
-                   CASE WHEN i.current_price <= %s THEN true ELSE false END as can_buy
-            FROM Item i
-            ORDER BY i.current_price
-        """, (money,))
-        
-        items = cur.fetchall()
-        
-        return render_template('muggle/items.html', 
-                             items=items,
-                             money=money)
-                             
-    finally:
-        cur.close()
-        conn.close()
-
-# 가격 조회 API
-@app.route('/api/items/prices')
-def get_item_prices():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("""
-            SELECT item_id, item_name, current_price 
-            FROM Item 
-            ORDER BY item_id
-        """)
-        items = cur.fetchall()
-        return jsonify([{
-            'item_id': item[0],
-            'item_name': item[1],
-            'price': float(item[2])
-        } for item in items])
-    finally:
-        cur.close()
-        conn.close()
-# 물건 구매
-@app.route('/muggle/buy_item/<int:item_id>', methods=['POST'])
-@login_required
-def buy_item(item_id):
-    if session.get('role') != 'Muggle':
-        return jsonify({'success': False, 'message': '머글만 접근할 수 있습니다.'})
-    
-    amount = int(request.form.get('amount', 1))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 트랜잭션 시작
-        cur.execute("BEGIN")
-        
-        # 현재 물건 가격과 머글의 돈 확인
-        cur.execute("""
-            SELECT i.current_price, m.money, i.item_name
-            FROM Item i, Muggle m
-            WHERE i.item_id = %s AND m.muggle_id = %s
-        """, (item_id, session['user_id']))
-        
-        result = cur.fetchone()
-        if not result:
-            raise Exception("물건 또는 사용자 정보를 을 수 없습니다.")
-            
-        price, money, item_name = result
-        total_cost = price * amount
-        
-        if total_cost > money:
-            raise Exception("보유 금액이 부족합니다.")
-        
-        # 머글의 돈 차감
-        cur.execute("""
-            UPDATE Muggle
-            SET money = money - %s
-            WHERE muggle_id = %s
-        """, (total_cost, session['user_id']))
-        
-        # 보유 물건 추가/업데이트
-        cur.execute("""
-            INSERT INTO ItemOwnership (owner_id, item_id, price, amount)
-            VALUES (%s, %s, %s, %s)
-            ON CONFLICT (owner_id, item_id) DO UPDATE
-            SET amount = ItemOwnership.amount + %s,
-                price = (ItemOwnership.price * ItemOwnership.amount + %s * %s) / (ItemOwnership.amount + %s)
-        """, (session['user_id'], item_id, price, amount, amount, price, amount, amount))
-        
-        conn.commit()
-        return jsonify({
-            'success': True, 
-            'message': f'{item_name} {amount}개를 {price}G에 구매했습니다.'
-        })
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-# 가격 업데이트 함수
-def update_item_prices():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 각 아이템의 가격을 -10%에서 +10% 사이로 랜덤하게 변동
-        cur.execute("""
-            UPDATE Item
-            SET current_price = 
-                CASE 
-                    WHEN current_price * (1 + (random() * 0.2 - 0.1)) < 100 THEN 100
-                    ELSE current_price * (1 + (random() * 0.2 - 0.1))
-                END
-            RETURNING item_id, item_name, current_price;
-        """)
-        
-        conn.commit()
-        print("가격이 업데이트되었습니다.")
-    except Exception as e:
-        print(f"가격 업데이트 중 오류 발생: {e}")
-    finally:
-        cur.close()
-        conn.close()
-
-# 기본 아이템 추가 함수
-def initialize_items():
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 기존 아이템이 있는지 확인
-        cur.execute("SELECT COUNT(*) FROM Item")
-        if cur.fetchone()[0] == 0:
-            # 기본 아이템 추가
-            items = [
-                ('마법의 돌', 1000.00),
-                ('불사조 깃털', 800.00),
-                ('용의 비늘', 500.00),
-                ('유니콘 뿔', 1200.00),
-                ('마법 약초', 300.00)
-            ]
-            
-            cur.executemany(
-                "INSERT INTO Item (item_name, current_price) VALUES (%s, %s)",
-                items
-            )
-            
-            conn.commit()
-            print("기본 아이템이 추가되었습니다.")
-    finally:
-        cur.close()
-        conn.close()
-
-# 보유 물건 목록 조회
-@app.route('/muggle/my_items')
-@login_required
-def view_my_items():
-    if session.get('role') != 'Muggle':
-        flash('머글만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("""
-            SELECT i.item_id, i.item_name, io.amount, io.price, i.current_price
-            FROM ItemOwnership io
-            JOIN Item i ON io.item_id = i.item_id
-            WHERE io.owner_id = %s
-        """, (session['user_id'],))
-        
-        items = cur.fetchall()
-        return render_template('muggle/my_items.html', items=items)
-    finally:
-        cur.close()
-        conn.close()
-
-# 물건 판매
-@app.route('/muggle/sell_item/<int:item_id>', methods=['POST'])
-@login_required
-def sell_item(item_id):
-    if session.get('role') != 'Muggle':
-        return jsonify({'success': False, 'message': '머글만 접근할 수 있습니다.'})
-    
-    amount = int(request.form.get('amount', 1))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        # 보유 물건 확인
-        cur.execute("""
-            SELECT io.amount, i.current_price, i.item_name
-            FROM ItemOwnership io
-            JOIN Item i ON io.item_id = i.item_id
-            WHERE io.owner_id = %s AND io.item_id = %s
-        """, (session['user_id'], item_id))
-        
-        result = cur.fetchone()
-        if not result:
-            raise Exception("보유하지 않은 물건입니다.")
-            
-        owned_amount, current_price, item_name = result
-        
-        if amount > owned_amount:
-            raise Exception("보유량이 부족합니다.")
-        
-        total_earning = current_price * amount
-        
-        # 글의 돈 증가
-        cur.execute("""
-            UPDATE Muggle
-            SET money = money + %s
-            WHERE muggle_id = %s
-        """, (total_earning, session['user_id']))
-        
-        # 보유 물건 감소
-        if amount == owned_amount:
+        if role == 'Muggle':
             cur.execute("""
-                DELETE FROM ItemOwnership
-                WHERE owner_id = %s AND item_id = %s
-            """, (session['user_id'], item_id))
+                SELECT heart, attack_power, money 
+                FROM Muggle 
+                WHERE muggle_id = %s
+            """, (session['user_id'],))
+            result = cur.fetchone()
+            if result is None:
+                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
+                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
+                return redirect(url_for('login'))
+            context = {
+                'username': session['username'],
+                'role': role,
+                'heart': result[0],
+                'attack_power': result[1],
+                'money': result[2]
+            }
+        elif role in ['Student', 'Villain']:
+            table_name = {'Student': 'Student', 'Villain': 'Villain'}[role]
+            id_column = {'Student': 'student_id', 'Villain': 'villain_id'}[role]
+            
+            cur.execute(f"""
+                SELECT heart, attack_power 
+                FROM {table_name} 
+                WHERE {id_column} = %s
+            """, (session['user_id'],))
+            result = cur.fetchone()
+            if result is None:
+                session.clear()  # 세션 데이터 불일치로 인해 세션 클리어
+                flash('데이터베이스 오류가 발생했습니다. 다시 로그인해주세요.')
+                return redirect(url_for('login'))
+            context = {
+                'username': session['username'],
+                'role': role,
+                'heart': result[0],
+                'attack_power': result[1]
+            }
         else:
-            cur.execute("""
-                UPDATE ItemOwnership
-                SET amount = amount - %s
-                WHERE owner_id = %s AND item_id = %s
-            """, (amount, session['user_id'], item_id))
+            context = {
+                'username': session['username'],
+                'role': role
+            }
         
-        conn.commit()
-        return jsonify({
-            'success': True,
-            'message': f'{item_name} {amount}개를 {current_price}G에 판매했습니다.'
-        })
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
+        return render_template('home.html', **context)
     finally:
         cur.close()
         conn.close()
 
-# 마법 상점 조
-@app.route('/muggle/magic_shop')
-@login_required
-def view_magic_shop():
-    if session.get('role') != 'Muggle':
-        flash('머글만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 현재 머글의 돈 조회
-        cur.execute("""
-            SELECT money 
-            FROM Muggle 
-            WHERE muggle_id = %s
-        """, (session['user_id'],))
-        
-        money = cur.fetchone()[0]
-        
-        # 구매 가능한 마법 목록 조회 (교수 이름 포함)
-        cur.execute("""
-            SELECT m.magic_id, m.magic_name, m.power, ms.price,
-                   CASE WHEN ms.price <= %s THEN true ELSE false END as can_buy,
-                   p.name as creator_name
-            FROM Magic m
-            JOIN MagicShop ms ON m.magic_id = ms.magic_id
-            LEFT JOIN Professor pr ON m.creator_id = pr.professor_id
-            LEFT JOIN Person p ON pr.professor_id = p.id
-            ORDER BY ms.price
-        """, (money,))
-        
-        magics = cur.fetchall()
-        return render_template('muggle/magic_shop.html', 
-                             magics=magics,
-                             money=money)
-    finally:
-        cur.close()
-        conn.close()
 
-# 마법 구매
-@app.route('/muggle/buy_magic/<int:magic_id>', methods=['POST'])
-@login_required
-def buy_magic(magic_id):
-    if session.get('role') != 'Muggle':
-        return jsonify({'success': False, 'message': '머글👤 접근할 수 있습니다.'})
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        # 마법 정보와 머글의 돈 확인
-        cur.execute("""
-            SELECT m.magic_name, m.power, ms.price, mu.money
-            FROM Magic m
-            JOIN MagicShop ms ON m.magic_id = ms.magic_id
-            JOIN Muggle mu ON mu.muggle_id = %s
-            WHERE m.magic_id = %s
-        """, (session['user_id'], magic_id))
-        
-        result = cur.fetchone()
-        if not result:
-            raise Exception("마법을 찾을 수 없습니다.")
-            
-        magic_name, power, price, money = result
-        
-        if price > money:
-            raise Exception("보유 금액이 부족합니다.")
-        
-        # 머글의 돈 차감 및 공격력 증가
-        cur.execute("""
-            UPDATE Muggle
-            SET money = money - %s,
-                attack_power = attack_power + %s
-            WHERE muggle_id = %s
-        """, (price, power, session['user_id']))
-        
-        conn.commit()
-        return jsonify({
-            'success': True,
-            'message': f'{magic_name} 마법을 {price}G에 구매했습니다. 공격력이 {power} 증가했습니다!'
-        })
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-# 스케줄러 설정
-scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_item_prices, trigger="interval", seconds=5)
-
+##### 생명력 구매 기능 #####
 @app.route('/buy_heart', methods=['POST'])
 @login_required
 def buy_heart():
@@ -686,6 +287,379 @@ def buy_heart():
         cur.close()
         conn.close()
 
+############################# 머글 #############################
+
+##### 물건 거래소 #####
+# 물건 목록 조회
+@app.route('/muggle/items')
+@login_required
+def view_items():
+    if session.get('role') != 'Muggle':
+        flash('머글만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 현재 머글의 돈 조회
+        cur.execute("""
+            SELECT money 
+            FROM Muggle 
+            WHERE muggle_id = %s
+        """, (session['user_id'],))
+        
+        money = cur.fetchone()[0]
+        
+        # 모든 물건 목록 조회
+        cur.execute("""
+            SELECT i.item_id, i.item_name, i.current_price,
+                   CASE WHEN i.current_price <= %s THEN true ELSE false END as can_buy
+            FROM Item i
+            ORDER BY i.current_price
+        """, (money,))
+        
+        items = cur.fetchall()
+        
+        return render_template('muggle/items.html', 
+                             items=items,
+                             money=money)
+                             
+    finally:
+        cur.close()
+        conn.close()
+
+# 가격 조회 API
+@app.route('/api/items/prices')
+def get_item_prices():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT item_id, item_name, current_price 
+            FROM Item 
+            ORDER BY item_id
+        """)
+        items = cur.fetchall()
+        return jsonify([{
+            'item_id': item[0],
+            'item_name': item[1],
+            'price': float(item[2])
+        } for item in items])
+    finally:
+        cur.close()
+        conn.close()
+
+# 물건 구매
+@app.route('/muggle/buy_item/<int:item_id>', methods=['POST'])
+@login_required
+def buy_item(item_id):
+    if session.get('role') != 'Muggle':
+        return jsonify({'success': False, 'message': '머글만 접근할 수 있습니다.'})
+    
+    amount = int(request.form.get('amount', 1))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 트랜잭션 시작
+        cur.execute("BEGIN")
+        
+        # 현재 물건 가격과 머글의 돈 확인
+        cur.execute("""
+            SELECT i.current_price, m.money, i.item_name
+            FROM Item i, Muggle m
+            WHERE i.item_id = %s AND m.muggle_id = %s
+        """, (item_id, session['user_id']))
+        
+        result = cur.fetchone()
+        if not result:
+            raise Exception("물건 또는 사용자 정보를 을 수 없습니다.")
+            
+        price, money, item_name = result
+        total_cost = price * amount
+        
+        if total_cost > money:
+            raise Exception("보유 금액이 부족합니다.")
+        
+        # 머글의 돈 차감
+        cur.execute("""
+            UPDATE Muggle
+            SET money = money - %s
+            WHERE muggle_id = %s
+        """, (total_cost, session['user_id']))
+        
+        # 보유 물건 추가/업데이트
+        cur.execute("""
+            INSERT INTO ItemOwnership (owner_id, item_id, price, amount)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (owner_id, item_id) DO UPDATE
+            SET amount = ItemOwnership.amount + %s,
+                price = (ItemOwnership.price * ItemOwnership.amount + %s * %s) / (ItemOwnership.amount + %s)
+        """, (session['user_id'], item_id, price, amount, amount, price, amount, amount))
+        
+        conn.commit()
+        return jsonify({
+            'success': True, 
+            'message': f'{item_name} {amount}개를 {price}G에 구매했습니다.'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+# 가격 업데이트 함수
+def update_item_prices():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 각 아이템의 가격을 -10%에서 +10% 사이로 랜덤하게 변동, 최저가 100G
+        cur.execute("""
+            UPDATE Item
+            SET current_price = 
+                CASE 
+                    WHEN current_price * (1 + (random() * 0.2 - 0.1)) < 100 THEN 100
+                    ELSE current_price * (1 + (random() * 0.2 - 0.1))
+                END
+            RETURNING item_id, item_name, current_price;
+        """)
+        
+        conn.commit()
+        print("가격이 업데이트되었습니다.")
+    except Exception as e:
+        print(f"가격 업데이트 중 오류 발생: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
+# 스케줄러 설정
+scheduler = BackgroundScheduler()
+scheduler.add_job(func=update_item_prices, trigger="interval", seconds=5) # 5초 마다 한번씩 update_item_prices 함수 실행
+
+# 기본 아이템 추가 함수
+def initialize_items():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 기존 아이템이 있는지 확인
+        cur.execute("SELECT COUNT(*) FROM Item")
+        if cur.fetchone()[0] == 0:
+            # 기본 아이템 추가
+            items = [
+                ('마법의 돌', 1000.00),
+                ('불사조 깃털', 800.00),
+                ('용의 비늘', 500.00),
+                ('유니콘 뿔', 1200.00),
+                ('마법 약초', 300.00)
+            ]
+            
+            cur.executemany(
+                "INSERT INTO Item (item_name, current_price) VALUES (%s, %s)",
+                items
+            )
+            
+            conn.commit()
+            print("기본 아이템이 추가되었습니다.")
+    finally:
+        cur.close()
+        conn.close()
+
+##### 내 물건 목록 조회 #####
+@app.route('/muggle/my_items')
+@login_required
+def view_my_items():
+    if session.get('role') != 'Muggle':
+        flash('머글만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT i.item_id, i.item_name, io.amount, io.price, i.current_price
+            FROM ItemOwnership io
+            JOIN Item i ON io.item_id = i.item_id
+            WHERE io.owner_id = %s
+        """, (session['user_id'],))
+        
+        items = cur.fetchall()
+        return render_template('muggle/my_items.html', items=items)
+    finally:
+        cur.close()
+        conn.close()
+
+# 물건 판매
+@app.route('/muggle/sell_item/<int:item_id>', methods=['POST'])
+@login_required
+def sell_item(item_id):
+    if session.get('role') != 'Muggle':
+        return jsonify({'success': False, 'message': '머글만 접근할 수 있습니다.'})
+    
+    amount = int(request.form.get('amount', 1))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 보유 물건 확인
+        cur.execute("""
+            SELECT io.amount, i.current_price, i.item_name
+            FROM ItemOwnership io
+            JOIN Item i ON io.item_id = i.item_id
+            WHERE io.owner_id = %s AND io.item_id = %s
+        """, (session['user_id'], item_id))
+        
+        result = cur.fetchone()
+        if not result:
+            raise Exception("보유하지 않은 물건입니다.")
+            
+        owned_amount, current_price, item_name = result
+        
+        if amount > owned_amount:
+            raise Exception("보유량이 부족합니다.")
+        
+        total_earning = current_price * amount
+        
+        # 머글의 돈 증가
+        cur.execute("""
+            UPDATE Muggle
+            SET money = money + %s
+            WHERE muggle_id = %s
+        """, (total_earning, session['user_id']))
+        
+        # 보유 물건 감소
+        if amount == owned_amount:
+            cur.execute("""
+                DELETE FROM ItemOwnership
+                WHERE owner_id = %s AND item_id = %s
+            """, (session['user_id'], item_id))
+        else:
+            cur.execute("""
+                UPDATE ItemOwnership
+                SET amount = amount - %s
+                WHERE owner_id = %s AND item_id = %s
+            """, (amount, session['user_id'], item_id))
+        
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f'{item_name} {amount}개를 {current_price}G에 판매했습니다.'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+##### 마법 상점 조회 #####
+@app.route('/muggle/magic_shop')
+@login_required
+def view_magic_shop():
+    if session.get('role') != 'Muggle':
+        flash('머글만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 현재 머글의 돈 조회
+        cur.execute("""
+            SELECT money 
+            FROM Muggle 
+            WHERE muggle_id = %s
+        """, (session['user_id'],))
+        
+        money = cur.fetchone()[0]
+        
+        # 구매 가능한 마법 목록 조회 (교수 이름 포함)
+        cur.execute("""
+            SELECT m.magic_id, m.magic_name, m.power, ms.price,
+                   CASE WHEN ms.price <= %s THEN true ELSE false END as can_buy,
+                   p.name as creator_name
+            FROM Magic m
+            JOIN MagicShop ms ON m.magic_id = ms.magic_id
+            LEFT JOIN Professor pr ON m.creator_id = pr.professor_id
+            LEFT JOIN Person p ON pr.professor_id = p.id
+            ORDER BY ms.price
+        """, (money,))
+        
+        magics = cur.fetchall()
+        return render_template('muggle/magic_shop.html', 
+                             magics=magics,
+                             money=money)
+    finally:
+        cur.close()
+        conn.close()
+
+# 마법 구매
+@app.route('/muggle/buy_magic/<int:magic_id>', methods=['POST'])
+@login_required
+def buy_magic(magic_id):
+    if session.get('role') != 'Muggle':
+        return jsonify({'success': False, 'message': '머글만 접근할 수 있습니다.'})
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 마법 정보와 머글의 돈 확인
+        cur.execute("""
+            SELECT m.magic_name, m.power, ms.price, mu.money
+            FROM Magic m
+            JOIN MagicShop ms ON m.magic_id = ms.magic_id
+            JOIN Muggle mu ON mu.muggle_id = %s
+            WHERE m.magic_id = %s
+        """, (session['user_id'], magic_id))
+        
+        result = cur.fetchone()
+        if not result:
+            raise Exception("마법을 찾을 수 없습니다.")
+            
+        magic_name, power, price, money = result
+        
+        if price > money:
+            raise Exception("보유 금액이 부족합니다.")
+        
+        # 머글의 돈 차감 및 공격력 증가
+        cur.execute("""
+            UPDATE Muggle
+            SET money = money - %s,
+                attack_power = attack_power + %s
+            WHERE muggle_id = %s
+        """, (price, power, session['user_id']))
+        
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f'{magic_name} 마법을 {price}G에 구매했습니다. 공격력이 {power} 증가했습니다!'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+
+
+############################# 빌런 #############################
+##### 빌런 게임 조회 #####
 @app.route('/villain/games')
 @login_required
 def villain_games():
@@ -705,14 +679,16 @@ def villain_games():
         cur.close()
         conn.close()
 
+##### 가위바위보 게임화면으로 이동 #####
 @app.route('/villain/rock_paper_scissors')
 @login_required
 def rock_paper_scissors():
     if session.get('role') != 'Villain':
-        flash('빌런��� 접근할 수 있습니다.')
+        flash('빌런만 접근할 수 있습니다.')
         return redirect(url_for('home'))
     return render_template('villain/rock_paper_scissors.html')
 
+##### 가위바위보 게임 플레이 #####
 @app.route('/villain/play_rps', methods=['POST'])
 @login_required
 def play_rps():
@@ -770,6 +746,7 @@ def play_rps():
         cur.close()
         conn.close()
 
+##### 숫자야구 게임화면으로 이동 #####
 @app.route('/villain/number_baseball')
 @login_required
 def number_baseball():
@@ -778,11 +755,12 @@ def number_baseball():
         return redirect(url_for('home'))
     return render_template('villain/number_baseball.html')
 
+##### 숫자야구 게임 플레이 #####
 @app.route('/villain/complete_baseball', methods=['POST'])
 @login_required
 def complete_baseball():
     if session.get('role') != 'Villain':
-        return jsonify({'success': False, 'message': '빌런만 플��이할 수 있습니다.'})
+        return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
     
     data = request.get_json()
     is_win = data.get('result', False)
@@ -851,42 +829,7 @@ QUIZ_DATABASE = [
     }
 ]
 
-
-def generate_quiz():
-    try:
-        response = client.chat.completions.create(
-            model="gpt-3.5-turbo",
-            messages=[{
-                "role": "system",
-                "content": """상식 퀴즈를 생성해주세요. 
-                다음 형식의 JSON으로 응답해주세요:
-                {
-                    "question": "퀴즈 질문",
-                    "options": ["보기1", "보기2", "보기3", "보기4"],
-                    "correct_answer": 정답의인덱스(0-3),
-                    "explanation": "정답에 대한 설명"
-                }
-                
-                퀴즈는 일반상식, 과학, 역사, 문화 등 다양한 분야에서 출제해주세요.
-                난이도는 중간 정도로 해주세요."""
-            }],
-            temperature=0.7
-        )
-        
-        # API 응답에서 JSON 추출
-        quiz_data = json.loads(response.choices[0].message.content)
-        return quiz_data
-        
-    except Exception as e:
-        print(f"퀴즈 생성 중 오류 발생: {e}")
-        # 오류 발생 시 기본 퀴즈 반환
-        return {
-            "question": "태양계에서 가장 큰 행성은?",
-            "options": ["화성", "목성", "토성", "금성"],
-            "correct_answer": 1,
-            "explanation": "목성은 태양계에서 가장 큰 행성입니다."
-        }
-
+##### 퀴즈 게임화면으로 이동 #####
 @app.route('/villain/quiz_game')
 @login_required
 def quiz_game():
@@ -897,11 +840,12 @@ def quiz_game():
     quiz = random.choice(QUIZ_DATABASE)
     return render_template('villain/quiz_game.html', quiz_data=quiz)
 
+##### 퀴즈 게임 플레이 #####
 @app.route('/villain/complete_quiz', methods=['POST'])
 @login_required
 def complete_quiz():
     if session.get('role') != 'Villain':
-        return jsonify({'success': False, 'message': '빌런만 플레이할 수 ��습니다.'})
+        return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
     
     data = request.get_json()
     is_correct = data.get('result', False)
@@ -941,6 +885,521 @@ def complete_quiz():
         cur.close()
         conn.close()
 
+##### 게임 시도 목록 조회 #####
+@app.route('/villain/game_history')
+@login_required
+def view_game_history():
+    if session.get('role') != 'Villain':
+        flash('빌런만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT g.game_name, 
+                   COUNT(*) as total_attempts,
+                   SUM(CASE WHEN ga.result = true THEN 1 ELSE 0 END) as wins,
+                   MAX(ga.attempt_time) as last_attempt
+            FROM Game g
+            JOIN GameAttempt ga ON g.game_id = ga.game_id
+            WHERE ga.villain_id = %s
+            GROUP BY g.game_name
+            ORDER BY last_attempt DESC
+        """, (session['user_id'],))
+        
+        game_history = cur.fetchall()
+        return render_template('villain/game_history.html', game_history=game_history)
+    finally:
+        cur.close()
+        conn.close()
+
+######################## 학생 #############################
+##### 강의 목록 조회 #####
+@app.route('/student/courses')
+@login_required
+def view_courses():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    sort_by = request.args.get('sort', 'magic_name_asc')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 강의 목록 조회 쿼리
+        query = """
+            SELECT m.magic_id, m.magic_name, p.name as professor_name,
+                   c.capacity, c.current_enrollment, c.opening_status,
+                   CASE WHEN e.student_id IS NOT NULL THEN true ELSE false END as is_enrolled
+            FROM Magic m
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Professor pr ON c.instructor_id = pr.professor_id
+            JOIN Person p ON pr.professor_id = p.id
+            LEFT JOIN Enrollment e ON m.magic_id = e.course_id AND e.student_id = %s
+        """
+        
+        # 정렬 조건 적용
+        sort_mapping = {
+            'magic_name_asc': 'magic_name ASC',
+            'magic_name_desc': 'magic_name DESC',
+            'professor_asc': 'professor_name ASC',
+            'professor_desc': 'professor_name DESC',
+            'capacity_asc': 'capacity ASC',
+            'capacity_desc': 'capacity DESC'
+        }
+        query += f" ORDER BY {sort_mapping.get(sort_by, 'magic_name ASC')}"
+        
+        cur.execute(query, (session['user_id'],))
+        courses = cur.fetchall()
+        
+        return render_template('student/courses.html', 
+                             courses=courses,
+                             sort_by=sort_by)
+    finally:
+        cur.close()
+        conn.close()
+
+##### 강의 수강신청 #####
+@app.route('/student/enroll/<int:magic_id>', methods=['POST'])
+@login_required
+def enroll_course(magic_id):
+    if session.get('role') != 'Student':
+        return jsonify({'success': False, 'message': '학생만 수강신청할 수 있습니다.'})
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 수강 가능 여부 확인
+        cur.execute("""
+            SELECT c.capacity, c.current_enrollment, c.opening_status
+            FROM Course c
+            WHERE c.course_id = %s
+        """, (magic_id,))
+        
+        course_info = cur.fetchone()
+        if not course_info:
+            raise Exception("강의를 찾을 수 없습니다.")
+        
+        capacity, current_enrollment, opening_status = course_info
+        
+        if not opening_status:
+            raise Exception("수강신청이 마감된 강의입니다.")
+        
+        if current_enrollment >= capacity:
+            raise Exception("수강 정원이 초과되었습니다.")
+        
+        # 수강신청 처리
+        cur.execute("""
+            INSERT INTO Enrollment (course_id, student_id)
+            VALUES (%s, %s)
+        """, (magic_id, session['user_id']))
+        
+        # 현재 수강 인원 증가
+        cur.execute("""
+            UPDATE Course
+            SET current_enrollment = current_enrollment + 1,
+                opening_status = CASE 
+                    WHEN current_enrollment + 1 >= capacity THEN false 
+                    ELSE true 
+                END
+            WHERE course_id = %s
+        """, (magic_id,))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '수강신청이 완료되었습니다.'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+##### N행시 제출 #####
+@app.route('/student/submit_nsentence/<int:magic_id>', methods=['POST'])
+@login_required
+def submit_nsentence(magic_id):
+    if session.get('role') != 'Student':
+        return jsonify({'success': False, 'message': '학생만 N행시를 제출할 수 있습니다.'})
+    
+    content = request.form.get('content')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # 수강 여부와 기존 N행시 점수 확인
+        cur.execute("""
+            SELECT mn.score 
+            FROM Enrollment e
+            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
+            WHERE e.course_id = %s AND e.student_id = %s
+        """, (magic_id, session['user_id']))
+        
+        result = cur.fetchone()
+        if not result:
+            raise Exception("수강 중인 강의가 아닙니다.")
+        
+        if result[0] is not None:
+            raise Exception("이미 평가된 N행시는 수정할 수 없습니다.")
+        
+        # N행시 제출/수정
+        cur.execute("""
+            INSERT INTO Magic_NSentence (magic_id, student_id, content)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (magic_id, student_id) 
+            DO UPDATE SET content = EXCLUDED.content
+            WHERE Magic_NSentence.score IS NULL
+        """, (magic_id, session['user_id'], content))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': 'N행시가 제출되었습니다.'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+##### 내 강의 목록 조회 #####
+@app.route('/student/my_courses')
+@login_required
+def view_my_courses():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    sort_by = request.args.get('sort', 'magic_name_asc')
+    
+    sort_conditions = {
+        'magic_name_asc': 'm.magic_name ASC',
+        'magic_name_desc': 'm.magic_name DESC',
+        'professor_asc': 'p.name ASC',
+        'professor_desc': 'p.name DESC',
+        'score_asc': 'COALESCE(mn.score, -1) ASC',
+        'score_desc': 'COALESCE(mn.score, -1) DESC'
+    }
+    
+    order_by = sort_conditions.get(sort_by, 'm.magic_name ASC')
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("""
+            SELECT 
+                m.magic_id,
+                m.magic_name,
+                m.power as attack_power,
+                p.name AS professor_name,
+                mn.content AS nsentence,
+                mn.score,
+                CASE 
+                    WHEN mn.score >= 90 THEN 'A'
+                    WHEN mn.score >= 80 THEN 'B'
+                    WHEN mn.score >= 70 THEN 'C'
+                    WHEN mn.score >= 60 THEN 'D'
+                    WHEN mn.score IS NOT NULL THEN 'F'
+                    ELSE NULL
+                END AS grade
+            FROM Enrollment e
+            JOIN Magic m ON e.course_id = m.magic_id
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Professor pr ON c.instructor_id = pr.professor_id
+            JOIN Person p ON pr.professor_id = p.id
+            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
+            WHERE e.student_id = %s
+            ORDER BY """ + order_by, 
+            (session['user_id'],)
+        )
+        
+        courses = cur.fetchall()
+        return render_template('student/my_courses.html', courses=courses, sort_by=sort_by)
+        
+    finally:
+        cur.close()
+        conn.close()
+
+##### N행시 게시판 조회 #####
+@app.route('/student/nsentence_board')
+@login_required
+def view_nsentence_board():
+    if session.get('role') != 'Student':
+        flash('학생만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    selected_course = request.args.get('course', type=int)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 학생이 수강한 강좌 목록
+        cur.execute("""
+            SELECT DISTINCT m.magic_id, m.magic_name
+            FROM Enrollment e
+            JOIN Magic m ON e.course_id = m.magic_id
+            WHERE e.student_id = %s
+            ORDER BY m.magic_name
+        """, (session['user_id'],))
+        magic_courses = cur.fetchall()
+        
+        # N행시 목록 조회
+        if selected_course:
+            cur.execute("""
+                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
+                FROM Magic_NSentence mn
+                JOIN Magic m ON mn.magic_id = m.magic_id
+                JOIN Person p ON mn.student_id = p.id
+                WHERE mn.magic_id = %s
+                AND EXISTS (
+                    SELECT 1 FROM Enrollment e 
+                    WHERE e.course_id = mn.magic_id 
+                    AND e.student_id = %s
+                )
+                ORDER BY mn.score DESC NULLS LAST, p.name
+            """, (selected_course, session['user_id']))
+        else:
+            cur.execute("""
+                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
+                FROM Magic_NSentence mn
+                JOIN Magic m ON mn.magic_id = m.magic_id
+                JOIN Person p ON mn.student_id = p.id
+                WHERE EXISTS (
+                    SELECT 1 FROM Enrollment e 
+                    WHERE e.course_id = mn.magic_id 
+                    AND e.student_id = %s
+                )
+                ORDER BY m.magic_name, mn.score DESC NULLS LAST, p.name
+            """, (session['user_id'],))
+        
+        nsentences = cur.fetchall()
+        return render_template('student/nsentence_board.html', 
+                             magic_courses=magic_courses,
+                             nsentences=nsentences,
+                             selected_course=selected_course)
+    finally:
+        cur.close()
+        conn.close()
+
+######################## 교수 #############################
+##### 연구 화면으로 이동 #####
+@app.route('/professor/research')
+@login_required
+def magic_research():
+    if session.get('role') != 'Professor':
+        flash('교수만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    return render_template('professor/research.html')
+
+##### 연구 시도 #####
+@app.route('/professor/research/attempt', methods=['POST'])
+@login_required
+def attempt_research():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 연구를 할 수 있습니다.'})
+    
+    # 50% 확률로 연구 성공 (테스트를 위해 확률을 높게 설정)
+    if random.random() <= 0.5:
+        # 3~8 글자 랜덤 배정
+        name_length = random.randint(3, 8)
+        return jsonify({
+            'success': True,
+            'message': '연구에 성공했습니다!',
+            'name_length': name_length
+        })
+    else:
+        return jsonify({
+            'success': False,
+            'message': '연구에 실패했습니다. 다시 시도해주세요.'
+        })
+
+##### 마법 생성 #####
+@app.route('/professor/create_magic', methods=['POST'])
+@login_required
+def create_magic():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 마법을 만들 수 있습니다.'})
+    
+    magic_name = request.form.get('magic_name')
+    power = random.randint(5, 15)  # 랜덤 공격력 배정
+    capacity = int(request.form.get('capacity', 30))
+    price = random.randint(50, 200)  # 랜덤 가격 배정 (50~200 사이)
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("BEGIN")
+        
+        # Magic 테이블에 추가
+        cur.execute("""
+            INSERT INTO Magic (magic_name, power, creator_id)
+            VALUES (%s, %s, %s)
+            RETURNING magic_id
+        """, (magic_name, power, session['user_id']))
+        
+        magic_id = cur.fetchone()[0]
+        
+        # Course 테이블에 추가
+        cur.execute("""
+            INSERT INTO Course (course_id, instructor_id, capacity)
+            VALUES (%s, %s, %s)
+        """, (magic_id, session['user_id'], capacity))
+        
+        # MagicShop 테이블에 추가
+        cur.execute("""
+            INSERT INTO MagicShop (magic_id, price)
+            VALUES (%s, %s)
+        """, (magic_id, price))
+        
+        conn.commit()
+        return jsonify({
+            'success': True,
+            'message': f'마법 "{magic_name}"이(가) 생성되었습니다. (공격력: {power}, 가격: {price}골드)'
+        })
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+##### 학생 성적 관리 #####
+@app.route('/professor/grade_students')
+@login_required
+def view_students():
+    if session.get('role') != 'Professor':
+        flash('교수만 접근할 수 있습니다.')
+        return redirect(url_for('home'))
+    
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 쿼리 수정: 마법별로 그룹화하고 학생들을 하나의 리스트로 정리
+        cur.execute("""
+            SELECT 
+                m.magic_id,
+                m.magic_name,
+                array_agg(p.name) as student_names,
+                array_agg(p.id) as student_ids,
+                array_agg(s.attack_power) as attack_powers,
+                array_agg(mn.content) as contents,
+                array_agg(mn.score) as scores
+            FROM Magic m
+            JOIN Course c ON m.magic_id = c.course_id
+            JOIN Enrollment e ON m.magic_id = e.course_id
+            JOIN Student s ON e.student_id = s.student_id
+            JOIN Person p ON s.student_id = p.id
+            LEFT JOIN Magic_NSentence mn ON m.magic_id = mn.magic_id 
+                AND e.student_id = mn.student_id
+            WHERE m.creator_id = %s
+            GROUP BY m.magic_id, m.magic_name
+            ORDER BY m.magic_name
+        """, (session['user_id'],))
+        
+        magic_groups = cur.fetchall()
+        return render_template('professor/grade.html', magic_groups=magic_groups)
+    finally:
+        cur.close()
+        conn.close()
+
+##### 학생 성적 부여 #####
+@app.route('/professor/submit_grade', methods=['POST'])
+@login_required
+def submit_grade():
+    if session.get('role') != 'Professor':
+        return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
+    
+    try:
+        magic_id = request.form.get('magic_id')
+        student_id = request.form.get('student_id')
+        score = int(request.form.get('score'))
+        
+        if not all([magic_id, student_id, score is not None]):
+            return jsonify({'success': False, 'message': '필요한 정보가 누락되었습니다.'})
+        
+        if score < 0 or score > 100:
+            return jsonify({'success': False, 'message': '성적은 0-100 사이여야 합니다.'})
+        
+        conn = get_db_connection()
+        cur = conn.cursor()
+        
+        try:
+            # 해당 마법이 이 교수가 만든 것인지 확인
+            cur.execute("""
+                SELECT 1 FROM Magic 
+                WHERE magic_id = %s AND creator_id = %s
+            """, (magic_id, session['user_id']))
+            
+            if not cur.fetchone():
+                return jsonify({'success': False, 'message': '본인이 만든 마법에 대해서만 평가할 수 있습니다.'})
+            
+            # N행시 존재 여부와 이미 평가되었는지 확인
+            cur.execute("""
+                SELECT score FROM Magic_NSentence
+                WHERE magic_id = %s AND student_id = %s
+            """, (magic_id, student_id))
+            
+            result = cur.fetchone()
+            if not result:
+                return jsonify({'success': False, 'message': 'N행시가 존재하지 않습니다.'})
+            if result[0] is not None:
+                return jsonify({'success': False, 'message': '이미 평가된 N행시입니다.'})
+            
+            # 트랜잭션 시작
+            cur.execute("BEGIN")
+            
+            # 성적 업데이트
+            cur.execute("""
+                UPDATE Magic_NSentence
+                SET score = %s
+                WHERE magic_id = %s AND student_id = %s
+            """, (score, magic_id, student_id))
+            
+            # 학생 공격력 증가 (성적에 비례)
+            attack_increase = score // 10
+            cur.execute("""
+                UPDATE Student
+                SET attack_power = attack_power + %s
+                WHERE student_id = %s
+            """, (attack_increase, student_id))
+            
+            conn.commit()
+            return jsonify({
+                'success': True,
+                'message': f'성적이 부여되었습니다. 학생의 공격력이 {attack_increase} 증가했습니다.'
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'success': False, 'message': str(e)})
+        finally:
+            cur.close()
+            conn.close()
+            
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)})
+
+
+
+
+
+
+
+##### 전투 목록 조회 #####
 @app.route('/battle_list')
 @login_required
 def battle_list():
@@ -1139,413 +1598,8 @@ def battle():
         cur.close()
         conn.close()
 
-######################## Student #############################
-@app.route('/student/courses')
-@login_required
-def view_courses():
-    if session.get('role') != 'Student':
-        flash('학생만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    sort_by = request.args.get('sort', 'magic_name_asc')
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 강의 목록 조회 쿼리
-        query = """
-            SELECT m.magic_id, m.magic_name, p.name as professor_name,
-                   c.capacity, c.current_enrollment, c.opening_status,
-                   CASE WHEN e.student_id IS NOT NULL THEN true ELSE false END as is_enrolled
-            FROM Magic m
-            JOIN Course c ON m.magic_id = c.course_id
-            JOIN Professor pr ON c.instructor_id = pr.professor_id
-            JOIN Person p ON pr.professor_id = p.id
-            LEFT JOIN Enrollment e ON m.magic_id = e.course_id AND e.student_id = %s
-        """
-        
-        # 정렬 조건 적용
-        sort_mapping = {
-            'magic_name_asc': 'magic_name ASC',
-            'magic_name_desc': 'magic_name DESC',
-            'professor_asc': 'professor_name ASC',
-            'professor_desc': 'professor_name DESC',
-            'capacity_asc': 'capacity ASC',
-            'capacity_desc': 'capacity DESC'
-        }
-        query += f" ORDER BY {sort_mapping.get(sort_by, 'magic_name ASC')}"
-        
-        cur.execute(query, (session['user_id'],))
-        courses = cur.fetchall()
-        
-        return render_template('student/courses.html', 
-                             courses=courses,
-                             sort_by=sort_by)
-    finally:
-        cur.close()
-        conn.close()
 
-@app.route('/student/enroll/<int:magic_id>', methods=['POST'])
-@login_required
-def enroll_course(magic_id):
-    if session.get('role') != 'Student':
-        return jsonify({'success': False, 'message': '학생만 수강신청할 수 있습니다.'})
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        # 수강 가능 여부 확인
-        cur.execute("""
-            SELECT c.capacity, c.current_enrollment, c.opening_status
-            FROM Course c
-            WHERE c.course_id = %s
-        """, (magic_id,))
-        
-        course_info = cur.fetchone()
-        if not course_info:
-            raise Exception("강의를 찾을 수 없습니다.")
-        
-        capacity, current_enrollment, opening_status = course_info
-        
-        if not opening_status:
-            raise Exception("수강신청이 마감된 강의입니다.")
-        
-        if current_enrollment >= capacity:
-            raise Exception("수강 정원이 초과되었습니다.")
-        
-        # 수강신청 처리
-        cur.execute("""
-            INSERT INTO Enrollment (course_id, student_id)
-            VALUES (%s, %s)
-        """, (magic_id, session['user_id']))
-        
-        # 현재 수강 인원 증가
-        cur.execute("""
-            UPDATE Course
-            SET current_enrollment = current_enrollment + 1,
-                opening_status = CASE 
-                    WHEN current_enrollment + 1 >= capacity THEN false 
-                    ELSE true 
-                END
-            WHERE course_id = %s
-        """, (magic_id,))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': '수강신청이 완료되었습니다.'})
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/student/submit_nsentence/<int:magic_id>', methods=['POST'])
-@login_required
-def submit_nsentence(magic_id):
-    if session.get('role') != 'Student':
-        return jsonify({'success': False, 'message': '학생만 N행시를 제출할 수 있습니다.'})
-    
-    content = request.form.get('content')
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        # 수강 여부와 기존 N행시 점수 확인
-        cur.execute("""
-            SELECT mn.score 
-            FROM Enrollment e
-            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
-            WHERE e.course_id = %s AND e.student_id = %s
-        """, (magic_id, session['user_id']))
-        
-        result = cur.fetchone()
-        if not result:
-            raise Exception("수강 중인 강의가 아닙니다.")
-        
-        if result[0] is not None:
-            raise Exception("이미 평가된 N행시는 수정할 수 없습니다.")
-        
-        # N행시 제출/수정
-        cur.execute("""
-            INSERT INTO Magic_NSentence (magic_id, student_id, content)
-            VALUES (%s, %s, %s)
-            ON CONFLICT (magic_id, student_id) 
-            DO UPDATE SET content = EXCLUDED.content
-            WHERE Magic_NSentence.score IS NULL
-        """, (magic_id, session['user_id'], content))
-        
-        conn.commit()
-        return jsonify({'success': True, 'message': 'N행시가 제출되었습니다.'})
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/student/my_courses')
-@login_required
-def view_my_courses():
-    if session.get('role') != 'Student':
-        flash('학생만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    sort_by = request.args.get('sort', 'magic_name_asc')
-    
-    sort_conditions = {
-        'magic_name_asc': 'm.magic_name ASC',
-        'magic_name_desc': 'm.magic_name DESC',
-        'professor_asc': 'p.name ASC',
-        'professor_desc': 'p.name DESC',
-        'score_asc': 'COALESCE(mn.score, -1) ASC',
-        'score_desc': 'COALESCE(mn.score, -1) DESC'
-    }
-    
-    order_by = sort_conditions.get(sort_by, 'm.magic_name ASC')
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("""
-            SELECT 
-                m.magic_id,
-                m.magic_name,
-                m.power as attack_power,
-                p.name AS professor_name,
-                mn.content AS nsentence,
-                mn.score,
-                CASE 
-                    WHEN mn.score >= 90 THEN 'A'
-                    WHEN mn.score >= 80 THEN 'B'
-                    WHEN mn.score >= 70 THEN 'C'
-                    WHEN mn.score >= 60 THEN 'D'
-                    WHEN mn.score IS NOT NULL THEN 'F'
-                    ELSE NULL
-                END AS grade
-            FROM Enrollment e
-            JOIN Magic m ON e.course_id = m.magic_id
-            JOIN Course c ON m.magic_id = c.course_id
-            JOIN Professor pr ON c.instructor_id = pr.professor_id
-            JOIN Person p ON pr.professor_id = p.id
-            LEFT JOIN Magic_NSentence mn ON e.course_id = mn.magic_id AND e.student_id = mn.student_id
-            WHERE e.student_id = %s
-            ORDER BY """ + order_by, 
-            (session['user_id'],)
-        )
-        
-        courses = cur.fetchall()
-        return render_template('student/my_courses.html', courses=courses, sort_by=sort_by)
-        
-    finally:
-        cur.close()
-        conn.close()
-
-######################## Professor #############################
-@app.route('/professor/research')
-@login_required
-def magic_research():
-    if session.get('role') != 'Professor':
-        flash('교수만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    return render_template('professor/research.html')
-
-@app.route('/professor/research/attempt', methods=['POST'])
-@login_required
-def attempt_research():
-    if session.get('role') != 'Professor':
-        return jsonify({'success': False, 'message': '교수만 연구를 할 수 있습니다.'})
-    
-    # 50% 확률로 연구 성공 (테스트를 위해 확률을 높게 설정)
-    if random.random() <= 0.5:
-        # 3~8 글자 랜덤 배정
-        name_length = random.randint(3, 8)
-        return jsonify({
-            'success': True,
-            'message': '연구에 성공했습니다!',
-            'name_length': name_length
-        })
-    else:
-        return jsonify({
-            'success': False,
-            'message': '연구에 실패했습니다. 다시 시도해주세요.'
-        })
-
-@app.route('/professor/create_magic', methods=['POST'])
-@login_required
-def create_magic():
-    if session.get('role') != 'Professor':
-        return jsonify({'success': False, 'message': '교수만 마법을 만들 수 있습니다.'})
-    
-    magic_name = request.form.get('magic_name')
-    power = random.randint(5, 15)  # 랜덤 공격력 배정
-    capacity = int(request.form.get('capacity', 30))
-    price = random.randint(50, 200)  # 랜덤 가격 배정 (50~200 사이)
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("BEGIN")
-        
-        # Magic 테이블에 추가
-        cur.execute("""
-            INSERT INTO Magic (magic_name, power, creator_id)
-            VALUES (%s, %s, %s)
-            RETURNING magic_id
-        """, (magic_name, power, session['user_id']))
-        
-        magic_id = cur.fetchone()[0]
-        
-        # Course 테이블에 추가
-        cur.execute("""
-            INSERT INTO Course (course_id, instructor_id, capacity)
-            VALUES (%s, %s, %s)
-        """, (magic_id, session['user_id'], capacity))
-        
-        # MagicShop 테이블에 추가
-        cur.execute("""
-            INSERT INTO MagicShop (magic_id, price)
-            VALUES (%s, %s)
-        """, (magic_id, price))
-        
-        conn.commit()
-        return jsonify({
-            'success': True,
-            'message': f'마법 "{magic_name}"이(가) 생성되었습니다. (공격력: {power}, 가격: {price}골드)'
-        })
-        
-    except Exception as e:
-        conn.rollback()
-        return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/professor/grade_students')
-@login_required
-def view_students():
-    if session.get('role') != 'Professor':
-        flash('교수만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 쿼리 수정: 마법별로 그룹화하고 학생들을 하나의 리스트로 정리
-        cur.execute("""
-            SELECT 
-                m.magic_id,
-                m.magic_name,
-                array_agg(p.name) as student_names,
-                array_agg(p.id) as student_ids,
-                array_agg(s.attack_power) as attack_powers,
-                array_agg(mn.content) as contents,
-                array_agg(mn.score) as scores
-            FROM Magic m
-            JOIN Course c ON m.magic_id = c.course_id
-            JOIN Enrollment e ON m.magic_id = e.course_id
-            JOIN Student s ON e.student_id = s.student_id
-            JOIN Person p ON s.student_id = p.id
-            LEFT JOIN Magic_NSentence mn ON m.magic_id = mn.magic_id 
-                AND e.student_id = mn.student_id
-            WHERE m.creator_id = %s
-            GROUP BY m.magic_id, m.magic_name
-            ORDER BY m.magic_name
-        """, (session['user_id'],))
-        
-        magic_groups = cur.fetchall()
-        return render_template('professor/grade.html', magic_groups=magic_groups)
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/professor/submit_grade', methods=['POST'])
-@login_required
-def submit_grade():
-    if session.get('role') != 'Professor':
-        return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
-    
-    try:
-        magic_id = request.form.get('magic_id')
-        student_id = request.form.get('student_id')
-        score = int(request.form.get('score'))
-        
-        if not all([magic_id, student_id, score is not None]):
-            return jsonify({'success': False, 'message': '필요한 정보가 누락되었습니다.'})
-        
-        if score < 0 or score > 100:
-            return jsonify({'success': False, 'message': '성적은 0-100 사이여야 합니다.'})
-        
-        conn = get_db_connection()
-        cur = conn.cursor()
-        
-        try:
-            # 해당 마법이 이 교수가 만든 것인지 확인
-            cur.execute("""
-                SELECT 1 FROM Magic 
-                WHERE magic_id = %s AND creator_id = %s
-            """, (magic_id, session['user_id']))
-            
-            if not cur.fetchone():
-                return jsonify({'success': False, 'message': '본인이 만든 마법에 대해서만 평가할 수 있습니다.'})
-            
-            # N행시 존재 여부와 이미 평가되었는지 확인
-            cur.execute("""
-                SELECT score FROM Magic_NSentence
-                WHERE magic_id = %s AND student_id = %s
-            """, (magic_id, student_id))
-            
-            result = cur.fetchone()
-            if not result:
-                return jsonify({'success': False, 'message': 'N행시가 존재하지 않습니다.'})
-            if result[0] is not None:
-                return jsonify({'success': False, 'message': '이미 평가된 N행시입니다.'})
-            
-            # 트랜잭션 시작
-            cur.execute("BEGIN")
-            
-            # 성적 업데이트
-            cur.execute("""
-                UPDATE Magic_NSentence
-                SET score = %s
-                WHERE magic_id = %s AND student_id = %s
-            """, (score, magic_id, student_id))
-            
-            # 학생 공격력 증가 (성적에 비례)
-            attack_increase = score // 10
-            cur.execute("""
-                UPDATE Student
-                SET attack_power = attack_power + %s
-                WHERE student_id = %s
-            """, (attack_increase, student_id))
-            
-            conn.commit()
-            return jsonify({
-                'success': True,
-                'message': f'성적이 부여되었습니다. 학생의 공격력이 {attack_increase} 증가했습니다.'
-            })
-            
-        except Exception as e:
-            conn.rollback()
-            return jsonify({'success': False, 'message': str(e)})
-        finally:
-            cur.close()
-            conn.close()
-            
-    except Exception as e:
-        return jsonify({'success': False, 'message': str(e)})
-
+##### 랭킹 조회 #####
 @app.route('/rankings')
 @login_required
 def view_rankings():
@@ -1592,97 +1646,7 @@ def view_rankings():
         cur.close()
         conn.close()
 
-@app.route('/villain/game_history')
-@login_required
-def view_game_history():
-    if session.get('role') != 'Villain':
-        flash('빌런만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        cur.execute("""
-            SELECT g.game_name, 
-                   COUNT(*) as total_attempts,
-                   SUM(CASE WHEN ga.result = true THEN 1 ELSE 0 END) as wins,
-                   MAX(ga.attempt_time) as last_attempt
-            FROM Game g
-            JOIN GameAttempt ga ON g.game_id = ga.game_id
-            WHERE ga.villain_id = %s
-            GROUP BY g.game_name
-            ORDER BY last_attempt DESC
-        """, (session['user_id'],))
-        
-        game_history = cur.fetchall()
-        return render_template('villain/game_history.html', game_history=game_history)
-    finally:
-        cur.close()
-        conn.close()
-
-@app.route('/student/nsentence_board')
-@login_required
-def view_nsentence_board():
-    if session.get('role') != 'Student':
-        flash('학생만 접근할 수 있습니다.')
-        return redirect(url_for('home'))
-    
-    selected_course = request.args.get('course', type=int)
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
-    try:
-        # 학생이 수강한 강좌 목록
-        cur.execute("""
-            SELECT DISTINCT m.magic_id, m.magic_name
-            FROM Enrollment e
-            JOIN Magic m ON e.course_id = m.magic_id
-            WHERE e.student_id = %s
-            ORDER BY m.magic_name
-        """, (session['user_id'],))
-        magic_courses = cur.fetchall()
-        
-        # N행시 목록 조회
-        if selected_course:
-            cur.execute("""
-                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
-                FROM Magic_NSentence mn
-                JOIN Magic m ON mn.magic_id = m.magic_id
-                JOIN Person p ON mn.student_id = p.id
-                WHERE mn.magic_id = %s
-                AND EXISTS (
-                    SELECT 1 FROM Enrollment e 
-                    WHERE e.course_id = mn.magic_id 
-                    AND e.student_id = %s
-                )
-                ORDER BY mn.score DESC NULLS LAST, p.name
-            """, (selected_course, session['user_id']))
-        else:
-            cur.execute("""
-                SELECT mn.magic_id, m.magic_name, p.name, mn.content, mn.score
-                FROM Magic_NSentence mn
-                JOIN Magic m ON mn.magic_id = m.magic_id
-                JOIN Person p ON mn.student_id = p.id
-                WHERE EXISTS (
-                    SELECT 1 FROM Enrollment e 
-                    WHERE e.course_id = mn.magic_id 
-                    AND e.student_id = %s
-                )
-                ORDER BY m.magic_name, mn.score DESC NULLS LAST, p.name
-            """, (session['user_id'],))
-        
-        nsentences = cur.fetchall()
-        return render_template('student/nsentence_board.html', 
-                             magic_courses=magic_courses,
-                             nsentences=nsentences,
-                             selected_course=selected_course)
-    finally:
-        cur.close()
-        conn.close()
-
 if __name__ == "__main__":
     scheduler.start()
-    initialize_items()  # 주석 해제
+    initialize_items()
     app.run(debug=True, host='0.0.0.0', port=5000)
