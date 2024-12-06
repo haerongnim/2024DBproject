@@ -23,182 +23,129 @@ def get_db_connection():
 
 def create_tables():
     commands = [
-        # 트리거 제거
-        "DROP TRIGGER IF EXISTS check_players_trigger ON Match;",
-        "DROP FUNCTION IF EXISTS check_valid_players();",
-
-        # Person 테이블
+        # Person 테이블: 모든 사용자의 기본 정보를 저장
         """
         CREATE TABLE IF NOT EXISTS Person (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(100) NOT NULL,
-            email VARCHAR(100) UNIQUE NOT NULL,
-            password VARCHAR(255) NOT NULL
+            id SERIAL PRIMARY KEY,          -- 자동 증가하는 고유 식별자
+            name VARCHAR(100) NOT NULL,     -- 사용자 이름 (필수)
+            email VARCHAR(100) UNIQUE NOT NULL,  -- 고유한 이메일 주소 (필수)
+            password VARCHAR(255) NOT NULL   -- 암호화된 비밀번호 (필수)
         )
         """,
-        # Student 테이블
+        # Student 테이블: 학생 특성 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Student (
-            student_id INTEGER PRIMARY KEY REFERENCES Person(id),
-            heart INTEGER DEFAULT 3,
-            attack_power INTEGER DEFAULT 10
+            student_id INTEGER PRIMARY KEY REFERENCES Person(id),  -- Person 테이블의 id를 참조
+            heart INTEGER DEFAULT 3,        -- 생명력 (기본값: 3)
+            attack_power INTEGER DEFAULT 10 -- 공격력 (기본값: 10)
         )
         """,
-        # Professor 테이블
+        # Professor 테이블: 교수 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Professor (
-            professor_id INTEGER PRIMARY KEY REFERENCES Person(id)
+            professor_id INTEGER PRIMARY KEY REFERENCES Person(id)  -- Person 테이블의 id를 참조
         )
         """,
-        # Villain 테이블
+        # Villain 테이블: 악당 특성 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Villain (
-            villain_id INTEGER PRIMARY KEY REFERENCES Person(id),
-            heart INTEGER DEFAULT 3,
-            attack_power INTEGER DEFAULT 15
+            villain_id INTEGER PRIMARY KEY REFERENCES Person(id),  -- Person 테이블의 id를 참조
+            heart INTEGER DEFAULT 3,        -- 생명력 (기본값: 3)
+            attack_power INTEGER DEFAULT 15 -- 공격력 (기본값: 15)
         )
         """,
-        # Muggle 테이블
+        # Muggle 테이블: 머글 특성 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Muggle (
-            muggle_id INTEGER PRIMARY KEY REFERENCES Person(id),
-            heart INTEGER DEFAULT 3,
-            attack_power INTEGER DEFAULT 5,
-            money DECIMAL(10,2) DEFAULT 1000.00
+            muggle_id INTEGER PRIMARY KEY REFERENCES Person(id),  -- Person 테이블의 id를 참조
+            heart INTEGER DEFAULT 3,        -- 생명력 (기본값: 3)
+            attack_power INTEGER DEFAULT 5, -- 공격력 (기본값: 5)
+            money DECIMAL(10,2) DEFAULT 1000.00  -- 보유 금액 (기본값: 1000.00)
         )
         """,
-        # Magic 테이블
+        # Magic 테이블: 마법 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Magic (
-            magic_id SERIAL PRIMARY KEY,
-            magic_name VARCHAR(100) NOT NULL,
-            power INTEGER NOT NULL,
-            creator_id INTEGER REFERENCES Professor(professor_id)
+            magic_id SERIAL PRIMARY KEY,    -- 자동 증가하는 고유 식별자
+            magic_name VARCHAR(100) NOT NULL,  -- 마법 이름 (필수)
+            power INTEGER NOT NULL,         -- 마법의 공격력
+            creator_id INTEGER REFERENCES Professor(professor_id)  -- 마법을 만든 교수 ID
         )
         """,
-        # Course 테이블
+        # Course 테이블: 강의 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Course (
-            course_id INTEGER REFERENCES Magic(magic_id),
-            instructor_id INTEGER REFERENCES Professor(professor_id),
-            capacity INTEGER NOT NULL,
-            current_enrollment INTEGER DEFAULT 0,
-            opening_status BOOLEAN DEFAULT true,
-            PRIMARY KEY (course_id, instructor_id)
+            course_id INTEGER PRIMARY KEY REFERENCES Magic(magic_id),  -- Magic 테이블의 magic_id를 참조
+            instructor_id INTEGER REFERENCES Professor(professor_id),  -- 강의 담당 교수 ID
+            capacity INTEGER DEFAULT 30,     -- 수강 정원 (기본값: 30)
+            current_enrollment INTEGER DEFAULT 0,  -- 현재 수강 인원
+            opening_status BOOLEAN DEFAULT true   -- 수강신청 가능 여부
         )
         """,
-        # Magic_NSentence 테이블
+        # Magic_NSentence 테이블: 학생들의 N행시 저장
         """
         CREATE TABLE IF NOT EXISTS Magic_NSentence (
-            magic_id INTEGER REFERENCES Magic(magic_id),
-            student_id INTEGER REFERENCES Student(student_id),
-            content TEXT NOT NULL,
-            score INTEGER,
-            PRIMARY KEY (magic_id, student_id)
+            magic_id INTEGER REFERENCES Magic(magic_id),    -- 마법 ID
+            student_id INTEGER REFERENCES Student(student_id),  -- 학생 ID
+            content TEXT NOT NULL,          -- N행시 내용
+            score INTEGER,                  -- 교수가 준 점수
+            PRIMARY KEY (magic_id, student_id)  -- 마법과 학생의 조합이 고유해야 함
         )
         """,
-        # Enrollment 테이블
+        # Enrollment 테이블: 수강 신청 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Enrollment (
-            course_id INTEGER,
-            student_id INTEGER REFERENCES Student(student_id),
-            PRIMARY KEY (course_id, student_id),
-            FOREIGN KEY (course_id) REFERENCES Magic(magic_id)
+            course_id INTEGER,              -- 강의 ID
+            student_id INTEGER REFERENCES Student(student_id),  -- 학생 ID
+            PRIMARY KEY (course_id, student_id),  -- 강의와 학생의 조합이 고유해야 함
+            FOREIGN KEY (course_id) REFERENCES Magic(magic_id)  -- Magic 테이블의 magic_id를 참조
         )
         """,
-        # Item 테이블
+        # Item 테이블: 상점에서 판매하는 아이템 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Item (
-            item_id SERIAL PRIMARY KEY,
-            item_name VARCHAR(100) NOT NULL,
-            current_price DECIMAL(10,2) NOT NULL
+            item_id SERIAL PRIMARY KEY,     -- 자동 증가하는 고유 식별자
+            item_name VARCHAR(100) NOT NULL,  -- 아이템 이름 (필수)
+            current_price DECIMAL(10,2) NOT NULL  -- 현재 가격
         )
         """,
-        # ItemOwnership 테이블
+        # ItemOwnership 테이블: 머글이 보유한 아이템 정보 저장
         """
         CREATE TABLE IF NOT EXISTS ItemOwnership (
-            owner_id INTEGER REFERENCES Muggle(muggle_id),
-            item_id INTEGER REFERENCES Item(item_id),
-            price DECIMAL(10,2) NOT NULL,
-            amount INTEGER NOT NULL,
-            PRIMARY KEY (owner_id, item_id)
+            owner_id INTEGER REFERENCES Muggle(muggle_id),  -- 소유자(머글) ID
+            item_id INTEGER REFERENCES Item(item_id),       -- 아이템 ID
+            price DECIMAL(10,2) NOT NULL,   -- 구매 당시 가격
+            amount INTEGER NOT NULL,        -- 보유 수량
+            PRIMARY KEY (owner_id, item_id)  -- 소유자와 아이템의 조합이 고유해야 함
         )
         """,
-        # Game 테이블
+        # Game 테이블: 미니게임 정보 저장
         """
         CREATE TABLE IF NOT EXISTS Game (
-            game_id SERIAL PRIMARY KEY,
-            game_name VARCHAR(100) NOT NULL,
-            game_description TEXT NOT NULL,
-            difficulty INTEGER NOT NULL,  -- 1: 쉬움, 2: 보통, 3: 어려움
-            reward INTEGER NOT NULL,      -- 공격력 증가량
-            route_name VARCHAR(100) NOT NULL  -- Flask 라우트 이름 (예: 'rock_paper_scissors')
+            game_id SERIAL PRIMARY KEY,     -- 자동 증가하는 고유 식별자
+            game_name VARCHAR(100) NOT NULL,  -- 게임 이름 (필수)
+            game_description TEXT NOT NULL,   -- 게임 설명
+            difficulty INTEGER NOT NULL,      -- 난이도 (1: 쉬움, 2: 보통, 3: 어려움)
+            reward INTEGER NOT NULL,          -- 성공 시 공격력 증가량
+            route_name VARCHAR(100) NOT NULL  -- Flask 라우트 이름
         )
         """,
-        # GameAttempt 테이블
+        # GameAttempt 테이블: 게임 시도 기록 저장
         """
         CREATE TABLE IF NOT EXISTS GameAttempt (
-            game_id INTEGER REFERENCES Game(game_id),
-            villain_id INTEGER REFERENCES Villain(villain_id),
-            result BOOLEAN NOT NULL,
-            attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY (game_id, villain_id, attempt_time)
+            game_id INTEGER REFERENCES Game(game_id),    -- 게임 ID
+            villain_id INTEGER REFERENCES Villain(villain_id),  -- 악당 ID
+            result BOOLEAN NOT NULL,        -- 성공 여부
+            attempt_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,  -- 시도 시간
+            PRIMARY KEY (game_id, villain_id, attempt_time)  -- 게임, 악당, 시간의 조합이 고유해야 함
         )
         """,
-        # MagicShop 테이블
+        # MagicShop 테이블: 판매중인 마법 정보 저장
         """
         CREATE TABLE IF NOT EXISTS MagicShop (
-            magic_id INTEGER PRIMARY KEY REFERENCES Magic(magic_id),
-            price DECIMAL(10,2) NOT NULL
+            magic_id INTEGER PRIMARY KEY REFERENCES Magic(magic_id),  -- Magic 테이블의 magic_id를 참조
+            price DECIMAL(10,2) NOT NULL    -- 마법의 판매 가격
         )
-        """,
-        # Match 테이블
-        """
-        CREATE TABLE IF NOT EXISTS Match (
-            match_id SERIAL PRIMARY KEY,
-            challenger_id INTEGER NOT NULL,
-            opponent_id INTEGER NOT NULL,
-            result BOOLEAN,
-            match_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-        """,
-        # 트리거 함수 생성
-        """
-        CREATE OR REPLACE FUNCTION check_valid_players()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            -- challenger_id 검증
-            IF NOT EXISTS (
-                SELECT 1 FROM Student WHERE student_id = NEW.challenger_id
-                UNION
-                SELECT 1 FROM Villain WHERE villain_id = NEW.challenger_id
-                UNION
-                SELECT 1 FROM Muggle WHERE muggle_id = NEW.challenger_id
-            ) THEN
-                RAISE EXCEPTION 'Invalid challenger_id';
-            END IF;
-
-            -- opponent_id 검증
-            IF NOT EXISTS (
-                SELECT 1 FROM Student WHERE student_id = NEW.opponent_id
-                UNION
-                SELECT 1 FROM Villain WHERE villain_id = NEW.opponent_id
-                UNION
-                SELECT 1 FROM Muggle WHERE muggle_id = NEW.opponent_id
-            ) THEN
-                RAISE EXCEPTION 'Invalid opponent_id';
-            END IF;
-
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        """,
-        # 트리거 생성
-        """
-        CREATE TRIGGER check_players_trigger
-        BEFORE INSERT OR UPDATE ON Match
-        FOR EACH ROW
-        EXECUTE FUNCTION check_valid_players();
         """
     ]
 
@@ -414,7 +361,6 @@ def view_test_data():
     finally:
         if conn is not None:
             conn.close()
-
 def delete_all_data():
     conn = None
     try:
@@ -439,14 +385,29 @@ def delete_all_data():
     finally:
         if conn is not None:
             conn.close()
-
+def drop_match_table():
+    command = "DROP TABLE IF EXISTS Match CASCADE;"
+    
+    conn = None
+    try:
+        conn = get_db_connection()
+        cur = conn.cursor()
+        cur.execute(command)
+        cur.close()
+        conn.commit()
+        print("Match table dropped successfully")
+        
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
 
 if __name__ == '__main__':
-    #create_tables()
-    insert_test_data()
-    view_test_data()
+    create_tables()
+    #insert_test_data()
+    #view_test_data()
     #drop_all_tables()
     #view_test_data()
     #delete_all_data()
-    
     
