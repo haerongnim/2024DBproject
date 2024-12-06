@@ -42,5 +42,4 @@ function updateCourse(magicId) {
     window.location.href = "{{ url_for('view_nsentence_board') }}" + (magicId ? "?course=" + magicId : "");
 }
 </script>
-<a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
 {% endblock %} 

@@ -1,7 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>내 물건 목록</title>
+{% extends "base.html" %}
+
+{% block content %}
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .item-card {
@@ -44,6 +43,33 @@
         .up { color: red !important; }
         .down { color: blue !important; }
     </style>
+
+    <h2>내 물건 목록</h2>
+    {% if items %}
+        {% for item in items %}
+            <div class="item-card">
+                <h3>{{ item[1] }}</h3>
+                <div>보유 수량: {{ item[2] }}개</div>
+                <div class="price-info">
+                    <div id="purchase-price-{{ item[0] }}" data-price="{{ item[3] }}">구매 가격: {{ item[3] }}G</div>
+                    <div id="current-price-{{ item[0] }}" data-price="{{ item[4] }}">현재 가격: {{ item[4] }}G</div>
+                    <div id="profit-{{ item[0] }}" class="{{ 'profit' if item[4] > item[3] else 'loss' }}">
+                        수익률: {{ ((item[4] - item[3]) / item[3] * 100)|round(2) }}%
+                    </div>
+                </div>
+                <div class="actions">
+                    <form class="sell-form" onsubmit="event.preventDefault(); sellItem({{ item[0] }}, {{ item[2] }})">
+                        <input type="number" id="amount-{{ item[0] }}" min="1" max="{{ item[2] }}" value="1">
+                        <button type="submit">판매하기</button>
+                    </form>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <p>보유한 물건이 없습니다.</p>
+    {% endif %}
+    
+
     <script>
         // 실시간 가격 업데이트
         function updatePrices() {
@@ -66,7 +92,7 @@
                                 currentPriceElement.classList.remove('up');
                             }
                             
-                            currentPriceElement.textContent = `${newPrice}G`;
+                            currentPriceElement.textContent = `현재 가격: ${newPrice}G`;
                             currentPriceElement.dataset.price = newPrice;
 
                             // 2초 후 스타일 제거
@@ -89,8 +115,8 @@
         // 페이지 로드 시 즉시 한 번 실행
         updatePrices();
 
-        // 10초마다 가격 업데이트
-        setInterval(updatePrices, 10000);
+        // 5초마다 가격 업데이트
+        setInterval(updatePrices, 5000);
 
         function sellItem(itemId, maxAmount) {
             const amount = document.getElementById(`amount-${itemId}`).value;
@@ -117,34 +143,4 @@
             });
         }
     </script>
-</head>
-<body>
-    <h2>내 물건 목록</h2>
-    {% if items %}
-        {% for item in items %}
-            <div class="item-card">
-                <h3>{{ item[1] }}</h3>
-                <div>보유 수량: {{ item[2] }}개</div>
-                <div class="price-info">
-                    <div id="purchase-price-{{ item[0] }}" data-price="{{ item[3] }}">구매 가격: {{ item[3] }}G</div>
-                    <div id="current-price-{{ item[0] }}" data-price="{{ item[4] }}">현재 가격: {{ item[4] }}G</div>
-                    <div id="profit-{{ item[0] }}" class="{{ 'profit' if item[4] > item[3] else 'loss' }}">
-                        수익률: {{ ((item[4] - item[3]) / item[3] * 100)|round(2) }}%
-                    </div>
-                </div>
-                <div class="actions">
-                    <form class="sell-form" onsubmit="event.preventDefault(); sellItem({{ item[0] }}, {{ item[2] }})">
-                        <input type="number" id="amount-{{ item[0] }}" min="1" max="{{ item[2] }}" value="1">
-                        <button type="submit">판매하기</button>
-                    </form>
-                </div>
-            </div>
-        {% endfor %}
-    {% else %}
-        <p>보유한 물건이 없습니다.</p>
-    {% endif %}
-    
-    <p><a href="{{ url_for('view_items') }}">물건 거래소로 가기</a></p>
-    <p><a href="{{ url_for('home') }}">홈으로 돌아가기</a></p>
-</body>
-</html> 
+{% endblock %} 

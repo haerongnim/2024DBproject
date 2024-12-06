@@ -210,7 +210,7 @@ def logout():
     session.clear()
     return redirect(url_for('login'))
 
-########################muggle#############################
+######################## 머글 #############################
 # 머글 상태 조회
 @app.route('/muggle/status')
 @login_required
@@ -514,7 +514,7 @@ def sell_item(item_id):
         cur.close()
         conn.close()
 
-# 마법 상점 조���
+# 마법 상점 조
 @app.route('/muggle/magic_shop')
 @login_required
 def view_magic_shop():
@@ -609,7 +609,7 @@ def buy_magic(magic_id):
 
 # 스케줄러 설정
 scheduler = BackgroundScheduler()
-scheduler.add_job(func=update_item_prices, trigger="interval", seconds=10)
+scheduler.add_job(func=update_item_prices, trigger="interval", seconds=5)
 
 @app.route('/buy_heart', methods=['POST'])
 @login_required
@@ -709,7 +709,7 @@ def villain_games():
 @login_required
 def rock_paper_scissors():
     if session.get('role') != 'Villain':
-        flash('빌런만 접근할 수 있습니다.')
+        flash('빌런��� 접근할 수 있습니다.')
         return redirect(url_for('home'))
     return render_template('villain/rock_paper_scissors.html')
 
@@ -782,7 +782,7 @@ def number_baseball():
 @login_required
 def complete_baseball():
     if session.get('role') != 'Villain':
-        return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
+        return jsonify({'success': False, 'message': '빌런만 플��이할 수 있습니다.'})
     
     data = request.get_json()
     is_win = data.get('result', False)
@@ -901,7 +901,7 @@ def quiz_game():
 @login_required
 def complete_quiz():
     if session.get('role') != 'Villain':
-        return jsonify({'success': False, 'message': '빌런만 플레이할 수 있습니다.'})
+        return jsonify({'success': False, 'message': '빌런만 플레이할 수 ��습니다.'})
     
     data = request.get_json()
     is_correct = data.get('result', False)
@@ -1365,8 +1365,8 @@ def attempt_research():
     if session.get('role') != 'Professor':
         return jsonify({'success': False, 'message': '교수만 연구를 할 수 있습니다.'})
     
-    # 10% 확률로 연구 성공
-    if random.random() <= 0.5:# 수정하기
+    # 50% 확률로 연구 성공 (테스트를 위해 확률을 높게 설정)
+    if random.random() <= 0.5:
         # 3~8 글자 랜덤 배정
         name_length = random.randint(3, 8)
         return jsonify({
@@ -1389,6 +1389,7 @@ def create_magic():
     magic_name = request.form.get('magic_name')
     power = random.randint(5, 15)  # 랜덤 공격력 배정
     capacity = int(request.form.get('capacity', 30))
+    price = random.randint(50, 200)  # 랜덤 가격 배정 (50~200 사이)
     
     conn = get_db_connection()
     cur = conn.cursor()
@@ -1411,10 +1412,16 @@ def create_magic():
             VALUES (%s, %s, %s)
         """, (magic_id, session['user_id'], capacity))
         
+        # MagicShop 테이블에 추가
+        cur.execute("""
+            INSERT INTO MagicShop (magic_id, price)
+            VALUES (%s, %s)
+        """, (magic_id, price))
+        
         conn.commit()
         return jsonify({
             'success': True,
-            'message': f'마법 "{magic_name}"이(가) 생성되었습니다.'
+            'message': f'마법 "{magic_name}"이(가) 생성되었습니다. (공격력: {power}, 가격: {price}골드)'
         })
         
     except Exception as e:
@@ -1435,10 +1442,16 @@ def view_students():
     cur = conn.cursor()
     
     try:
-        # 교수가 개설한 강의와 학생들의 N행시 조회
+        # 쿼리 수정: 마법별로 그룹화하고 학생들을 하나의 리스트로 정리
         cur.execute("""
-            SELECT m.magic_id, m.magic_name, p.name, p.id, s.attack_power,
-                   mn.content, mn.score
+            SELECT 
+                m.magic_id,
+                m.magic_name,
+                array_agg(p.name) as student_names,
+                array_agg(p.id) as student_ids,
+                array_agg(s.attack_power) as attack_powers,
+                array_agg(mn.content) as contents,
+                array_agg(mn.score) as scores
             FROM Magic m
             JOIN Course c ON m.magic_id = c.course_id
             JOIN Enrollment e ON m.magic_id = e.course_id
@@ -1447,11 +1460,12 @@ def view_students():
             LEFT JOIN Magic_NSentence mn ON m.magic_id = mn.magic_id 
                 AND e.student_id = mn.student_id
             WHERE m.creator_id = %s
-            ORDER BY m.magic_name, p.name
+            GROUP BY m.magic_id, m.magic_name
+            ORDER BY m.magic_name
         """, (session['user_id'],))
         
-        students = cur.fetchall()
-        return render_template('professor/grade.html', students=students)
+        magic_groups = cur.fetchall()
+        return render_template('professor/grade.html', magic_groups=magic_groups)
     finally:
         cur.close()
         conn.close()
@@ -1462,61 +1476,75 @@ def submit_grade():
     if session.get('role') != 'Professor':
         return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
     
-    magic_id = request.form.get('magic_id')
-    student_id = request.form.get('student_id')
-    score = int(request.form.get('score'))
-    
-    if score < 0 or score > 100:
-        return jsonify({'success': False, 'message': '성적은 0-100 사이여야 합니다.'})
-    
-    conn = get_db_connection()
-    cur = conn.cursor()
-    
     try:
-        cur.execute("BEGIN")
+        magic_id = request.form.get('magic_id')
+        student_id = request.form.get('student_id')
+        score = int(request.form.get('score'))
         
-        # 기존 성적 확인
-        cur.execute("""
-            SELECT score 
-            FROM Magic_NSentence
-            WHERE magic_id = %s AND student_id = %s
-        """, (magic_id, student_id))
+        if not all([magic_id, student_id, score is not None]):
+            return jsonify({'success': False, 'message': '필요한 정보가 누락되었습니다.'})
         
-        result = cur.fetchone()
-        if result and result[0] is not None:
-            raise Exception("이미 평가된 N행시입니다.")
+        if score < 0 or score > 100:
+            return jsonify({'success': False, 'message': '성적은 0-100 사이여야 합니다.'})
         
-        # 성적 부여
-        cur.execute("""
-            UPDATE Magic_NSentence
-            SET score = %s
-            WHERE magic_id = %s AND student_id = %s
-            AND score IS NULL
-        """, (score, magic_id, student_id))
+        conn = get_db_connection()
+        cur = conn.cursor()
         
-        if cur.rowcount == 0:
-            raise Exception("성적을 부여할 수 없습니다.")
-        
-        # 학생 공격력 증가 (성적에 비례)
-        attack_increase = score // 10
-        cur.execute("""
-            UPDATE Student
-            SET attack_power = attack_power + %s
-            WHERE student_id = %s
-        """, (attack_increase, student_id))
-        
-        conn.commit()
-        return jsonify({
-            'success': True,
-            'message': f'성적이 부여되었습니다. 학생의 공격력이 {attack_increase} 증가했습니다.'
-        })
-        
+        try:
+            # 해당 마법이 이 교수가 만든 것인지 확인
+            cur.execute("""
+                SELECT 1 FROM Magic 
+                WHERE magic_id = %s AND creator_id = %s
+            """, (magic_id, session['user_id']))
+            
+            if not cur.fetchone():
+                return jsonify({'success': False, 'message': '본인이 만든 마법에 대해서만 평가할 수 있습니다.'})
+            
+            # N행시 존재 여부와 이미 평가되었는지 확인
+            cur.execute("""
+                SELECT score FROM Magic_NSentence
+                WHERE magic_id = %s AND student_id = %s
+            """, (magic_id, student_id))
+            
+            result = cur.fetchone()
+            if not result:
+                return jsonify({'success': False, 'message': 'N행시가 존재하지 않습니다.'})
+            if result[0] is not None:
+                return jsonify({'success': False, 'message': '이미 평가된 N행시입니다.'})
+            
+            # 트랜잭션 시작
+            cur.execute("BEGIN")
+            
+            # 성적 업데이트
+            cur.execute("""
+                UPDATE Magic_NSentence
+                SET score = %s
+                WHERE magic_id = %s AND student_id = %s
+            """, (score, magic_id, student_id))
+            
+            # 학생 공격력 증가 (성적에 비례)
+            attack_increase = score // 10
+            cur.execute("""
+                UPDATE Student
+                SET attack_power = attack_power + %s
+                WHERE student_id = %s
+            """, (attack_increase, student_id))
+            
+            conn.commit()
+            return jsonify({
+                'success': True,
+                'message': f'성적이 부여되었습니다. 학생의 공격력이 {attack_increase} 증가했습니다.'
+            })
+            
+        except Exception as e:
+            conn.rollback()
+            return jsonify({'success': False, 'message': str(e)})
+        finally:
+            cur.close()
+            conn.close()
+            
     except Exception as e:
-        conn.rollback()
         return jsonify({'success': False, 'message': str(e)})
-    finally:
-        cur.close()
-        conn.close()
 
 @app.route('/rankings')
 @login_required

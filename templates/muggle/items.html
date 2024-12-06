@@ -1,7 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>물건 거래소</title>
+{% extends "base.html" %}
+
+{% block content %}
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .items-container { margin-top: 20px; }
@@ -48,6 +47,32 @@
             background-color: #45a049;
         }
     </style>
+
+    <div class="money-status">
+        💰 보유금액: {{ money }}G
+    </div>
+    
+    <h2>물건 거래소</h2>
+    <div class="items-container">
+        {% for item in items %}
+            <div class="item-card {% if not item[3] %}cannot-buy{% endif %}">
+                <div class="item-info">
+                    <h3>{{ item[1] }}</h3>
+                    <span class="price" id="price-{{ item[0] }}" data-price="{{ item[2] }}">
+                        {{ item[2] }}G
+                    </span>
+                </div>
+                {% if item[3] %}
+                    <form class="buy-form" data-item-id="{{ item[0] }}" onsubmit="event.preventDefault(); handleBuy(this)">
+                        <input type="number" id="amount-{{ item[0] }}" min="1" value="1">
+                        <button type="submit">구매하기</button>
+                    </form>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+    
+
     <script>
         // 실시간 가격 업데이트
         function updatePrices() {
@@ -86,8 +111,8 @@
         // 페이지 로드 시 즉시 한 번 실행
         updatePrices();
 
-        // 10초마다 가격 업데이트
-        setInterval(updatePrices, 10000);
+        // 5초마다 가격 업데이트
+        setInterval(updatePrices, 5000);
 
         function handleBuy(form) {
             const itemId = form.getAttribute('data-item-id');
@@ -116,33 +141,4 @@
             });
         }
     </script>
-</head>
-<body>
-    <div class="money-status">
-        💰 보유금액: {{ money }}G
-    </div>
-    
-    <h2>물건 거래소</h2>
-    <div class="items-container">
-        {% for item in items %}
-            <div class="item-card {% if not item[3] %}cannot-buy{% endif %}">
-                <div class="item-info">
-                    <h3>{{ item[1] }}</h3>
-                    <span class="price" id="price-{{ item[0] }}" data-price="{{ item[2] }}">
-                        {{ item[2] }}G
-                    </span>
-                </div>
-                {% if item[3] %}
-                    <form class="buy-form" data-item-id="{{ item[0] }}" onsubmit="event.preventDefault(); handleBuy(this)">
-                        <input type="number" id="amount-{{ item[0] }}" min="1" value="1">
-                        <button type="submit">구매하기</button>
-                    </form>
-                {% endif %}
-            </div>
-        {% endfor %}
-    </div>
-    
-    <p><a href="{{ url_for('view_my_items') }}">내 물건 목록</a></p>
-    <p><a href="{{ url_for('home') }}">홈으로 돌아가기</a></p>
-</body>
-</html> 
+{% endblock %} 

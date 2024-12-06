@@ -72,12 +72,24 @@
         .back-link {
             display: inline-block;
             margin-top: 20px;
-            color: #666;
+            color: #4e0061;
             text-decoration: none;
+            font-weight: bold;
+            padding: 8px 15px;
+            border: 2px solid #4e0061;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-link:hover {
+            background-color: #4e0061;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(78, 0, 97, 0.2);
         }
     </style>
 </head>
 <body>
+    <a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
     <h2>전투 상대 목록</h2>
     
     <div class="controls">
@@ -121,8 +133,6 @@
         </div>
         {% endfor %}
     </div>
-
-    <a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
 
     <script>
         function initiateBattle(opponentId) {
