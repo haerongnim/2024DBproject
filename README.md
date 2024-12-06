@@ -10,7 +10,7 @@
 
 ## 1. .env 설정
 자신의 local 환경에 맞게 .env 파일을 수정하세요
-```
+```dotenv
 DB_NAME="project"
 DB_USER="db_project"
 DB_PASSWORD="!db_project"
