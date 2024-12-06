@@ -1,7 +1,6 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>마법 상점</title>
+{% extends "base.html" %}
+
+{% block content %}
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
         .magic-container { margin-top: 20px; }
@@ -39,27 +38,7 @@
         .price { color: #4e0061; }
         .creator { color: purple; font-style: italic; }
     </style>
-    <script>
-        function buyMagic(magicId) {
-            fetch(`/muggle/buy_magic/${magicId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert(data.message);
-                    location.reload();
-                } else {
-                    alert(data.message);
-                }
-            });
-        }
-    </script>
-</head>
-<body>
+
     <div class="money-status">
         💰 보유금액: {{ money }}G
     </div>
@@ -80,7 +59,24 @@
             </div>
         {% endfor %}
     </div>
-    
-    <p><a href="{{ url_for('home') }}">홈으로 돌아가기</a></p>
-</body>
-</html> 
+
+    <script>
+        function buyMagic(magicId) {
+            fetch(`/muggle/buy_magic/${magicId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+    </script>
+{% endblock %} 
