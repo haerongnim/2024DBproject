@@ -105,13 +105,13 @@
             const rows = Array.from(table.getElementsByTagName('tr'));
             
             rows.sort((a, b) => {
-                const aValue = parseInt(a.cells[a.cells.length - 1].textContent);
-                const bValue = parseInt(b.cells[b.cells.length - 1].textContent);
-                return order === 'asc' ? aValue - bValue : bValue - aValue;
+                const aRank = parseInt(a.cells[0].textContent);
+                const bRank = parseInt(b.cells[0].textContent);
+                
+                return order === 'asc' ? bRank - aRank : aRank - bRank;
             });
             
-            rows.forEach((row, index) => {
-                row.cells[0].textContent = index + 1;
+            rows.forEach(row => {
                 table.appendChild(row);
             });
         }
