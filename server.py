@@ -689,7 +689,7 @@ def sell_item(item_id):
         if amount > owned_amount:
             raise Exception("보유량이 부족합니다.")
         
-        # 총 판매 수��� 계산
+        # 총 판매 수�� 계산
         total_earning = current_price * amount
         
         # 머글의 보유금액 증가 쿼리
@@ -708,7 +708,7 @@ def sell_item(item_id):
                 WHERE owner_id = %s AND item_id = %s
             """, (session['user_id'], item_id))
         else:
-            # 일부 판매시 - amount 필드 ���소
+            # 일부 판매시 - amount 필드 �����소
             cur.execute("""
                 UPDATE ItemOwnership
                 SET amount = amount - %s
@@ -1377,7 +1377,7 @@ def submit_nsentence(magic_id):
         conn.close()  # 연결 종료
 
 ##### 내 강의 목록 조회 #####
-@app.route('/student/my_courses')  # 내 ���의 목록을 조회하는 라우트
+@app.route('/student/my_courses')  # 내 강의 목록을 조회하는 라우트
 @login_required  # 로그인 필요
 def view_my_courses():
     # 학생 권한 체크 - 현재 세션의 role이 'Student'가 아닌 경우 접근 제한
@@ -1691,7 +1691,7 @@ def submit_grade():
         # 폼 데이터에서 필요한 정보 추출
         magic_id = request.form.get('magic_id')  # 마법 ID 가져오기
         student_id = request.form.get('student_id')  # 학생 ID 가져오기
-        score = int(request.form.get('score'))  # 점수를 정수로 ���환하��� 가져오기
+        score = int(request.form.get('score'))  # 점수를 정��로 �����환하��� 가져오기
         
         # 필수 데이터가 모두 존재하는지 확인
         if not all([magic_id, student_id, score is not None]):
@@ -1871,34 +1871,34 @@ def battle_list():
 @app.route('/battle', methods=['POST'])  # '/battle' URL에 대한 POST 요청 처리
 @login_required  # 로그인이 필요한 기능임을 명시하는 데코레이터
 def battle():
-    # 요청 데이터에서 상대방 ID 추출
-    data = request.get_json()
-    opponent_id = data.get('opponent_id')
-    
-    # 데이터베이스 연결 생성
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
-        # 현재 사용자의 정보 가져오기
+        data = request.get_json()
+        opponent_id = data.get('opponent_id')
+        
+        # 현재 사용자의 생명력 확인
         if session['role'] == 'Student':
             cur.execute("SELECT heart, attack_power FROM Student WHERE student_id = %s", (session['user_id'],))
         elif session['role'] == 'Villain':
             cur.execute("SELECT heart, attack_power FROM Villain WHERE villain_id = %s", (session['user_id'],))
-        else:  # Muggle
+        elif session['role'] == 'Muggle':
             cur.execute("SELECT heart, attack_power FROM Muggle WHERE muggle_id = %s", (session['user_id'],))
         
-        user_info = cur.fetchone()
-        user_heart = user_info[0]
-        user_attack = user_info[1]
+        user_stats = cur.fetchone()
+        if not user_stats or user_stats[0] <= 0:
+            return jsonify({'success': False, 'message': '생명력이 0 이하인 상태에서는 전투할 수 없습니다.'})
         
-        # 상대방 정보 가져오기
+        user_heart, user_attack = user_stats
+        
+        # 상대방 정보 확인
         cur.execute("""
             SELECT 
                 CASE 
                     WHEN s.student_id IS NOT NULL THEN 'Student'
                     WHEN v.villain_id IS NOT NULL THEN 'Villain'
-                    ELSE 'Muggle'
+                    WHEN m.muggle_id IS NOT NULL THEN 'Muggle'
                 END as role,
                 COALESCE(s.heart, v.heart, m.heart) as heart,
                 COALESCE(s.attack_power, v.attack_power, m.attack_power) as attack_power
@@ -1909,34 +1909,41 @@ def battle():
             WHERE p.id = %s
         """, (opponent_id,))
         
-        opponent_info = cur.fetchone()
-        opponent_role = opponent_info[0]
-        opponent_heart = opponent_info[1]
-        opponent_attack = opponent_info[2]
+        opponent = cur.fetchone()
+        if not opponent or opponent[1] <= 0:
+            return jsonify({'success': False, 'message': '선택한 상대와 전투할 수 없습니다.'})
         
-        # 상대방의 생명력이 0이면 전투 불가
-        if opponent_heart <= 0:
-            return jsonify({'success': False, 'message': '상대방의 생명력이 0이하라 전투를 할 수 없습니다.'})
+        opponent_role, opponent_heart, opponent_attack = opponent
         
-        # 전투 결과 계산
+        cur.execute("BEGIN")
+        
+        # 공격력 비교로 승패 결정
         if user_attack > opponent_attack:
-            # 승리
-            message = "전투에서 승리했습니다! 상대방의 생명력이 1 감소했습니다."
-            if opponent_role == 'Student':
-                cur.execute("UPDATE Student SET heart = GREATEST(0, heart - 1) WHERE student_id = %s", (opponent_id,))
-            elif opponent_role == 'Villain':
-                cur.execute("UPDATE Villain SET heart = GREATEST(0, heart - 1) WHERE villain_id = %s", (opponent_id,))
-            else:
-                cur.execute("UPDATE Muggle SET heart = GREATEST(0, heart - 1) WHERE muggle_id = %s", (opponent_id,))
-        else:
-            # 패배
-            message = "전투에서 패배했습니다. 당신의 생명력이 1 감소했습니다."
+            # 승리: 공격력 증가
             if session['role'] == 'Student':
-                cur.execute("UPDATE Student SET heart = GREATEST(0, heart - 1) WHERE student_id = %s", (session['user_id'],))
+                cur.execute("UPDATE Student SET attack_power = attack_power + 2 WHERE student_id = %s", 
+                           (session['user_id'],))
             elif session['role'] == 'Villain':
-                cur.execute("UPDATE Villain SET heart = GREATEST(0, heart - 1) WHERE villain_id = %s", (session['user_id'],))
-            else:
-                cur.execute("UPDATE Muggle SET heart = GREATEST(0, heart - 1) WHERE muggle_id = %s", (session['user_id'],))
+                cur.execute("UPDATE Villain SET attack_power = attack_power + 2 WHERE villain_id = %s", 
+                           (session['user_id'],))
+            elif session['role'] == 'Muggle':
+                cur.execute("UPDATE Muggle SET attack_power = attack_power + 2 WHERE muggle_id = %s", 
+                           (session['user_id'],))
+            message = "전투에서 승리했습니다! 공격력이 2 증가했습니다."
+        elif user_attack < opponent_attack:
+            # 패배: 생명력 감소
+            if session['role'] == 'Student':
+                cur.execute("UPDATE Student SET heart = heart - 1 WHERE student_id = %s", 
+                           (session['user_id'],))
+            elif session['role'] == 'Villain':
+                cur.execute("UPDATE Villain SET heart = heart - 1 WHERE villain_id = %s", 
+                           (session['user_id'],))
+            elif session['role'] == 'Muggle':
+                cur.execute("UPDATE Muggle SET heart = heart - 1 WHERE muggle_id = %s", 
+                           (session['user_id'],))
+            message = "전투에서 패배했습니다. 생명력이 1 감소했습니다."
+        else:
+            message = "비겼습니다! 아무 일도 일어나지 않았습니다."
         
         conn.commit()
         return jsonify({'success': True, 'message': message})
@@ -1945,9 +1952,9 @@ def battle():
         conn.rollback()
         return jsonify({'success': False, 'message': str(e)})
     finally:
-        # 데이터베이스 연결 자원 해제
         cur.close()
         conn.close()
+
 
 
 ##### 랭킹 조회 #####
@@ -2024,14 +2031,17 @@ def delete_user(user_id):
         # 트랜잭션 시작
         cur.execute("BEGIN")
         
-        # ��글인 경우 아이템 소유권 먼저 삭제
-        if user[3] == 'Muggle':
-            # 모든 아이템 소유권 삭제
+        if user[3] == 'Student':
+            # Magic_NSentence 삭제
+            cur.execute("DELETE FROM Magic_NSentence WHERE student_id = %s", (user_id,))
+            # Enrollment 삭제
+            cur.execute("DELETE FROM Enrollment WHERE student_id = %s", (user_id,))
+            # Student 테이블에서 삭제
+            cur.execute("DELETE FROM Student WHERE student_id = %s", (user_id,))
+        elif user[3] == 'Muggle':
             cur.execute("DELETE FROM ItemOwnership WHERE owner_id = %s", (user_id,))
             # 머글 테이블에서 삭제
             cur.execute("DELETE FROM Muggle WHERE muggle_id = %s", (user_id,))
-        elif user[3] == 'Student':
-            cur.execute("DELETE FROM Student WHERE student_id = %s", (user_id,))
         elif user[3] == 'Villain':
             cur.execute("DELETE FROM Villain WHERE villain_id = %s", (user_id,))
             
