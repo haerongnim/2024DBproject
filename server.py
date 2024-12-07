@@ -689,7 +689,7 @@ def sell_item(item_id):
         if amount > owned_amount:
             raise Exception("보유량이 부족합니다.")
         
-        # 총 판매 수익 계산
+        # 총 판매 수��� 계산
         total_earning = current_price * amount
         
         # 머글의 보유금액 증가 쿼리
@@ -1377,7 +1377,7 @@ def submit_nsentence(magic_id):
         conn.close()  # 연결 종료
 
 ##### 내 강의 목록 조회 #####
-@app.route('/student/my_courses')  # 내 강의 목록을 조회하는 라우트
+@app.route('/student/my_courses')  # 내 ���의 목록을 조회하는 라우트
 @login_required  # 로그인 필요
 def view_my_courses():
     # 학생 권한 체크 - 현재 세션의 role이 'Student'가 아닌 경우 접근 제한
@@ -1685,13 +1685,13 @@ def submit_grade():
     # 교수 권한이 있는지 체크
     if session.get('role') != 'Professor':
         # 교수가 아닌 경우 에러 메시지 반환
-        return jsonify({'success': False, 'message': '교수만 성적을 부여�� 수 있습니다.'})
+        return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
     
     try:
         # 폼 데이터에서 필요한 정보 추출
         magic_id = request.form.get('magic_id')  # 마법 ID 가져오기
         student_id = request.form.get('student_id')  # 학생 ID 가져오기
-        score = int(request.form.get('score'))  # 점수를 정수로 변환하여 가져오기
+        score = int(request.form.get('score'))  # 점수를 정수로 ���환하��� 가져오기
         
         # 필수 데이터가 모두 존재하는지 확인
         if not all([magic_id, student_id, score is not None]):
@@ -1871,9 +1871,11 @@ def battle_list():
 @app.route('/battle', methods=['POST'])  # '/battle' URL에 대한 POST 요청 처리
 @login_required  # 로그인이 필요한 기능임을 명시하는 데코레이터
 def battle():
+    # 요청 데이터에서 상대방 ID 추출
     data = request.get_json()
     opponent_id = data.get('opponent_id')
     
+    # 데이터베이스 연결 생성
     conn = get_db_connection()
     cur = conn.cursor()
     
@@ -1889,10 +1891,6 @@ def battle():
         user_info = cur.fetchone()
         user_heart = user_info[0]
         user_attack = user_info[1]
-        
-        # 생명력이 0이면 전투 불가
-        if user_heart <= 0:
-            return jsonify({'success': False, 'message': '생명력이 0이하라 전투를 할 수 없습니다.'})
         
         # 상대방 정보 가져오기
         cur.execute("""
@@ -2022,22 +2020,30 @@ def delete_user(user_id):
         
         if not user:
             return jsonify({'success': False, 'message': '삭제할 수 없는 사용자입니다.'})
-            
-        # 사용자 역할에 따른 테이블에서 삭제
-        if user[3] == 'Student':
+        
+        # 트랜잭션 시작
+        cur.execute("BEGIN")
+        
+        # ��글인 경우 아이템 소유권 먼저 삭제
+        if user[3] == 'Muggle':
+            # 모든 아이템 소유권 삭제
+            cur.execute("DELETE FROM ItemOwnership WHERE owner_id = %s", (user_id,))
+            # 머글 테이블에서 삭제
+            cur.execute("DELETE FROM Muggle WHERE muggle_id = %s", (user_id,))
+        elif user[3] == 'Student':
             cur.execute("DELETE FROM Student WHERE student_id = %s", (user_id,))
         elif user[3] == 'Villain':
             cur.execute("DELETE FROM Villain WHERE villain_id = %s", (user_id,))
-        elif user[3] == 'Muggle':
-            cur.execute("DELETE FROM Muggle WHERE muggle_id = %s", (user_id,))
             
         # Person 테이블에서 삭제
         cur.execute("DELETE FROM Person WHERE id = %s", (user_id,))
         
+        # 트랜잭션 커밋
         conn.commit()
         return jsonify({'success': True, 'message': '사용자가 삭제되었습니다.'})
         
     except Exception as e:
+        # 오류 발생 시 롤백
         conn.rollback()
         return jsonify({'success': False, 'message': str(e)})
     finally:
