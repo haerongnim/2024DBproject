@@ -67,6 +67,13 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'role' not in session or session['role'] != 'Admin':
+            return jsonify({'error': '관리자 권한이 필요합니다.'}), 403
+        return f(*args, **kwargs)
+    return decorated_function
 
 # 회원가입 처리
 @app.route('/signup', methods=['GET', 'POST'])  # '/signup' URL에 대한 GET, POST 요청 처리
@@ -159,40 +166,52 @@ def login():
         conn = get_db_connection()
         cur = conn.cursor()
         
-        # Person 테이블에서 입력된 이메일로 사용자 정보 조회
-        cur.execute("SELECT * FROM Person WHERE email = %s", (email,))
-        user = cur.fetchone()
-        
-        # 사용자가 존재하고 비밀번호가 일치하는 경우
-        if user and check_password_hash(user[3], password):  # user[3]은 password 컬럼
-            # 세션에 사용자 ID와 이름 저장
-            session['user_id'] = user[0]  # id
-            session['username'] = user[1]  # name
+        try:
+            # Person 테이블에서 입력된 이메일로 사용자 정보 조회
+            cur.execute("SELECT * FROM Person WHERE email = %s", (email,))
+            user = cur.fetchone()
             
-            # 사용자의 역할 확인을 위한 역할 목록
-            roles = ['Student', 'Professor', 'Villain', 'Muggle']
-            user_role = None
-            
-            # 각 역할 테이블을 확인하여 사용자의 역할 찾기
-            for role in roles:
-                cur.execute(f"SELECT * FROM {role} WHERE {role.lower()}_id = %s", (user[0],))
+            # 사용자가 존재하고 비밀번호가 일치하는 경우
+            if user and check_password_hash(user[3], password):  # user[3]은 password 컬럼
+                # 세션에 사용자 ID와 이름 저장
+                session['user_id'] = user[0]  # id
+                session['username'] = user[1]  # name
+                
+                # 역할 확�
+                cur.execute("SELECT * FROM Admin WHERE admin_id = %s", (user[0],))
                 if cur.fetchone():
-                    user_role = role
-                    break
+                    session['role'] = 'Admin'
+                    return redirect(url_for('home'))
+                    
+                # 사용자의 역할 확인을 위한 역할 목록
+                roles = ['Student', 'Professor', 'Villain', 'Muggle']
+                user_role = None
+                
+                # 각 역할 테이블을 확인하여 사용자의 역할 찾기
+                for role in roles:
+                    cur.execute(f"SELECT * FROM {role} WHERE {role.lower()}_id = %s", (user[0],))
+                    if cur.fetchone():
+                        user_role = role
+                        break
+                
+                # 역할이 확인된 경우
+                if user_role:
+                    # 세션에 역할 저장하고 홈 화면으로 리다이렉트
+                    session['role'] = user_role
+                    cur.close()
+                    conn.close()
+                    return redirect(url_for('home'))
             
-            # 역할이 확인된 경우
-            if user_role:
-                # 세션에 역할 저장하고 홈 화면으로 리다이렉트
-                session['role'] = user_role
-                cur.close()
-                conn.close()
-                return redirect(url_for('home'))
+            # 로그인 실패 시 에러 메시지 표시
+            flash('잘못된 이메일 또는 비밀번호입니다.')
+            cur.close()
+            conn.close()
+            return redirect(url_for('login'))
             
-        # 로그인 실패 시 에러 메시지 표시
-        flash('잘못된 이메일 또는 비밀번호입니다.')
-        cur.close()
-        conn.close()
-    
+        finally:
+            cur.close()
+            conn.close()
+            
     # GET 요청이거나 로그인 실패 시 로그인 페이지 표시
     return render_template('login.html')
 
@@ -689,7 +708,7 @@ def sell_item(item_id):
                 WHERE owner_id = %s AND item_id = %s
             """, (session['user_id'], item_id))
         else:
-            # 일부 판매시 - amount 필드 감소
+            # 일부 판매시 - amount 필드 ���소
             cur.execute("""
                 UPDATE ItemOwnership
                 SET amount = amount - %s
@@ -1666,7 +1685,7 @@ def submit_grade():
     # 교수 권한이 있는지 체크
     if session.get('role') != 'Professor':
         # 교수가 아닌 경우 에러 메시지 반환
-        return jsonify({'success': False, 'message': '교수만 성적을 부여할 수 있습니다.'})
+        return jsonify({'success': False, 'message': '교수만 성적을 부여�� 수 있습니다.'})
     
     try:
         # 폼 데이터에서 필요한 정보 추출
@@ -1755,7 +1774,6 @@ def submit_grade():
     except Exception as e:
         # 전체 처리 과정에서 발생한 예외 처리
         return jsonify({'success': False, 'message': str(e)})
-
 
 
 
@@ -1853,140 +1871,81 @@ def battle_list():
 @app.route('/battle', methods=['POST'])  # '/battle' URL에 대한 POST 요청 처리
 @login_required  # 로그인이 필요한 기능임을 명시하는 데코레이터
 def battle():
-    # 요청 데이터에서 상대방 ID 추출
     data = request.get_json()
     opponent_id = data.get('opponent_id')
     
-    # 데이터베이스 연결 생성
     conn = get_db_connection()
     cur = conn.cursor()
     
     try:
-        cur.execute("BEGIN")  # 트랜잭션 시작
+        # 현재 사용자의 정보 가져오기
+        if session['role'] == 'Student':
+            cur.execute("SELECT heart, attack_power FROM Student WHERE student_id = %s", (session['user_id'],))
+        elif session['role'] == 'Villain':
+            cur.execute("SELECT heart, attack_power FROM Villain WHERE villain_id = %s", (session['user_id'],))
+        else:  # Muggle
+            cur.execute("SELECT heart, attack_power FROM Muggle WHERE muggle_id = %s", (session['user_id'],))
         
-        # 현재 사용자의 공격력과 생명력 조회 - 역할에 따라 다른 테이블 조회
-        if session['role'] == 'Muggle':
-            # Muggle 테이블에서 현재 사용자의 공격력과 생명력을 조회
-            cur.execute("""
-                SELECT attack_power, heart  -- 공격력과 생명력 컬럼 선택
-                FROM Muggle                 -- Muggle 테이블에서
-                WHERE muggle_id = %s        -- 현재 사용자 ID와 일치하는 행 선택
-            """, (session['user_id'],))
-        elif session['role'] == 'Student':
-            # Student 테이블에서 현재 사용자의 공격력과 생명력을 조회
-            cur.execute("""
-                SELECT attack_power, heart  -- 공격력과 생명력 컬럼 선택
-                FROM Student               -- Student 테이블에서
-                WHERE student_id = %s      -- 현재 사용자 ID와 일치하는 행 선택
-            """, (session['user_id'],))
-        else:  # Villain
-            # Villain 테이블에서 현재 사용자의 공격력과 생명력을 조회
-            cur.execute("""
-                SELECT attack_power, heart  -- 공격력과 생명력 컬럼 선택
-                FROM Villain               -- Villain 테이블에서
-                WHERE villain_id = %s      -- 현재 사용자 ID와 일치하는 행 선택
-            """, (session['user_id'],))
+        user_info = cur.fetchone()
+        user_heart = user_info[0]
+        user_attack = user_info[1]
         
-        # 조회 결과 가져오기
-        player_stats = cur.fetchone()
-        if not player_stats:
-            raise Exception("사용자 정보를 찾을 수 없습니다.")
+        # 생명력이 0이면 전투 불가
+        if user_heart <= 0:
+            return jsonify({'success': False, 'message': '생명력이 0이하라 전투를 할 수 없습니다.'})
         
-        player_attack, player_heart = player_stats  # 공격력과 생명력 분리
-        
-        # 상대방의 공격력과 역할 조회
+        # 상대방 정보 가져오기
         cur.execute("""
             SELECT 
-                CASE                                                    -- CASE문 시작
-                    WHEN m.muggle_id IS NOT NULL THEN m.attack_power   -- Muggle인 경우 Muggle의 공격력
-                    WHEN s.student_id IS NOT NULL THEN s.attack_power  -- Student인 경우 Student의 공격력
-                    WHEN v.villain_id IS NOT NULL THEN v.attack_power  -- Villain인 경우 Villain의 공격력
-                END as attack_power,                                   -- 공격력 별칭 지정
-                CASE                                                   -- CASE문 시작
-                    WHEN m.muggle_id IS NOT NULL THEN 'Muggle'        -- Muggle인 경우
-                    WHEN s.student_id IS NOT NULL THEN 'Student'      -- Student인 경우
-                    WHEN v.villain_id IS NOT NULL THEN 'Villain'      -- Villain인 경우
-                END as role                                           -- 역할 별칭 지정
-            FROM Person p                                             -- Person 테이블을 기준으로
-            LEFT JOIN Muggle m ON p.id = m.muggle_id                 -- Muggle 테이블과 LEFT JOIN
-            LEFT JOIN Student s ON p.id = s.student_id               -- Student 테이블과 LEFT JOIN
-            LEFT JOIN Villain v ON p.id = v.villain_id               -- Villain 테이블과 LEFT JOIN
-            WHERE p.id = %s                                          -- 상대방 ID와 일치하는 행 선택
+                CASE 
+                    WHEN s.student_id IS NOT NULL THEN 'Student'
+                    WHEN v.villain_id IS NOT NULL THEN 'Villain'
+                    ELSE 'Muggle'
+                END as role,
+                COALESCE(s.heart, v.heart, m.heart) as heart,
+                COALESCE(s.attack_power, v.attack_power, m.attack_power) as attack_power
+            FROM Person p
+            LEFT JOIN Student s ON p.id = s.student_id
+            LEFT JOIN Villain v ON p.id = v.villain_id
+            LEFT JOIN Muggle m ON p.id = m.muggle_id
+            WHERE p.id = %s
         """, (opponent_id,))
         
-        # 조회 결과 가져오기
-        opponent_stats = cur.fetchone()
-        if not opponent_stats:
-            raise Exception("상대방 정보를 찾을 수 없니다.")
+        opponent_info = cur.fetchone()
+        opponent_role = opponent_info[0]
+        opponent_heart = opponent_info[1]
+        opponent_attack = opponent_info[2]
         
-        opponent_attack, opponent_role = opponent_stats  # 공격력과 역할 분리
+        # 상대방의 생명력이 0이면 전투 불가
+        if opponent_heart <= 0:
+            return jsonify({'success': False, 'message': '상대방의 생명력이 0이하라 전투를 할 수 없습니다.'})
         
-        # 전투 결과 처리 - 공격력 비교
-        if player_attack > opponent_attack:
-            # 승리: 공격력 2 증가
-            attack_increase = 2
-            if session['role'] == 'Muggle':
-                # Muggle의 공격력 업데이트
-                cur.execute("""
-                    UPDATE Muggle                              -- Muggle 테이블 업데이트
-                    SET attack_power = attack_power + %s       -- 공격력을 지정된 값만큼 증가
-                    WHERE muggle_id = %s                       -- 현재 사용자 ID와 일치하는 행 선택
-                """, (attack_increase, session['user_id']))
-            elif session['role'] == 'Student':
-                # Student의 공격력 업데이트
-                cur.execute("""
-                    UPDATE Student                            -- Student 테이블 업데이트
-                    SET attack_power = attack_power + %s      -- 공격력을 지정된 값만큼 증가
-                    WHERE student_id = %s                     -- 현재 사용자 ID와 일치하는 행 선택
-                """, (attack_increase, session['user_id']))
-            else:  # Villain
-                # Villain의 공격력 업데이트
-                cur.execute("""
-                    UPDATE Villain                           -- Villain 테이블 업데이트
-                    SET attack_power = attack_power + %s     -- 공격력을 지정된 값만큼 증가
-                    WHERE villain_id = %s                    -- 현재 사용자 ID와 일치하는 행 선택
-                """, (attack_increase, session['user_id']))
-            
-            message = f"승리! 공격력이 {attack_increase} 증가했습니다."
-            
-        elif player_attack < opponent_attack:
-            # 패배: 생명력 1 감소
-            if player_heart <= 1:
-                raise Exception("생명력이 부족하여 전투할 수 없습니다.")
-            
-            if session['role'] == 'Muggle':
-                # Muggle의 생명력 감소
-                cur.execute("""
-                    UPDATE Muggle                    -- Muggle 테이블 업데이트
-                    SET heart = heart - 1           -- 생명력을 1 감소
-                    WHERE muggle_id = %s            -- 현재 사용자 ID와 일치하는 행 선택
-                """, (session['user_id'],))
-            elif session['role'] == 'Student':
-                # Student의 생명력 감소
-                cur.execute("""
-                    UPDATE Student                  -- Student 테이블 업데이트
-                    SET heart = heart - 1          -- 생명력을 1 감소
-                    WHERE student_id = %s          -- 현재 사용자 ID와 일치하는 행 선택
-                """, (session['user_id'],))
-            else:  # Villain
-                # Villain의 생명력 감소
-                cur.execute("""
-                    UPDATE Villain                 -- Villain 테이블 업데이트
-                    SET heart = heart - 1         -- 생명력을 1 감소
-                    WHERE villain_id = %s         -- 현재 사용자 ID와 일치하는 행 선택
-                """, (session['user_id'],))
-            
-            message = "패배... 생명력이 1 감소했습니다."
-            
+        # 전투 결과 계산
+        if user_attack > opponent_attack:
+            # 승리
+            message = "전투에서 승리했습니다! 상대방의 생명력이 1 감소했습니다."
+            if opponent_role == 'Student':
+                cur.execute("UPDATE Student SET heart = GREATEST(0, heart - 1) WHERE student_id = %s", (opponent_id,))
+            elif opponent_role == 'Villain':
+                cur.execute("UPDATE Villain SET heart = GREATEST(0, heart - 1) WHERE villain_id = %s", (opponent_id,))
+            else:
+                cur.execute("UPDATE Muggle SET heart = GREATEST(0, heart - 1) WHERE muggle_id = %s", (opponent_id,))
         else:
-            message = "무승부입니다!"  # 공격력이 같은 경우
+            # 패배
+            message = "전투에서 패배했습니다. 당신의 생명력이 1 감소했습니다."
+            if session['role'] == 'Student':
+                cur.execute("UPDATE Student SET heart = GREATEST(0, heart - 1) WHERE student_id = %s", (session['user_id'],))
+            elif session['role'] == 'Villain':
+                cur.execute("UPDATE Villain SET heart = GREATEST(0, heart - 1) WHERE villain_id = %s", (session['user_id'],))
+            else:
+                cur.execute("UPDATE Muggle SET heart = GREATEST(0, heart - 1) WHERE muggle_id = %s", (session['user_id'],))
         
-        conn.commit()  # 트랜잭션 커밋
-        return jsonify({'success': True, 'message': message})  # 성공 응답 반환
+        conn.commit()
+        return jsonify({'success': True, 'message': message})
         
     except Exception as e:
-        conn.rollback()  # 오류 발생 시 롤백
-        return jsonify({'success': False, 'message': str(e)})  # 실패 응답 반환
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
     finally:
         # 데이터베이스 연결 자원 해제
         cur.close()
@@ -2049,7 +2008,60 @@ def view_rankings():
         cur.close()
         conn.close()
 
+@app.route('/admin/delete_user/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # dead_users view에서 해당 사용자 확인
+        cur.execute("SELECT * FROM dead_users WHERE id = %s", (user_id,))
+        user = cur.fetchone()
+        
+        if not user:
+            return jsonify({'success': False, 'message': '삭제할 수 없는 사용자입니다.'})
+            
+        # 사용자 역할에 따른 테이블에서 삭제
+        if user[3] == 'Student':
+            cur.execute("DELETE FROM Student WHERE student_id = %s", (user_id,))
+        elif user[3] == 'Villain':
+            cur.execute("DELETE FROM Villain WHERE villain_id = %s", (user_id,))
+        elif user[3] == 'Muggle':
+            cur.execute("DELETE FROM Muggle WHERE muggle_id = %s", (user_id,))
+            
+        # Person 테이블에서 삭제
+        cur.execute("DELETE FROM Person WHERE id = %s", (user_id,))
+        
+        conn.commit()
+        return jsonify({'success': True, 'message': '사용자가 삭제되었습니다.'})
+        
+    except Exception as e:
+        conn.rollback()
+        return jsonify({'success': False, 'message': str(e)})
+    finally:
+        cur.close()
+        conn.close()
+
+@app.route('/admin/dead_users')
+@login_required
+@admin_required
+def view_dead_users():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        cur.execute("SELECT * FROM dead_users")
+        dead_users = cur.fetchall()
+        return render_template('admin/dead_users.html', dead_users=dead_users)
+    finally:
+        cur.close()
+        conn.close()
+
 if __name__ == "__main__":
     scheduler.start()
+    initialize_items()
+    app.run(debug=True, host='0.0.0.0', port=5000)
     initialize_items()
     app.run(debug=True, host='0.0.0.0', port=5000)

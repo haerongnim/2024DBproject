@@ -140,7 +140,7 @@
             </div>
             
             <div class="status-info">
-                {% if role != 'Professor' %}
+                {% if role != 'Professor' and role != 'Admin' %}
                     <span class="status-item">❤️ {{ heart }}</span>
                     <span class="status-item">⚔️ {{ attack_power }}</span>
                 {% endif %}
@@ -149,7 +149,7 @@
                 {% endif %}
             </div>
             
-            {% if role != 'Professor' %}
+            {% if role != 'Professor' and role != 'Admin' %}
                 <button onclick="buyHeart()" class="buy-heart">
                     {% if role == 'Muggle' %}
                         생명력 구매 (1000G)
@@ -179,15 +179,17 @@
                 <h3>빌런 메뉴</h3>
                 <a href="{{ url_for('villain_games') }}" class="menu-link">💪 강해지기</a>
                 <a href="{{ url_for('view_game_history') }}" class="menu-link">🎮 게임 기록</a>
+            {% elif role == 'Admin' %}
+                <h3>관리자 메뉴</h3>
+                <a href="{{ url_for('view_dead_users') }}" class="menu-link">⚰️ 사용자 관리</a>
             {% endif %}
             {% if role in ['Student', 'Villain', 'Muggle'] %}
-   
-                    <a href="{{ url_for('battle_list') }}" class="menu-link">⚔️ 싸우기</a>
-                
+                <a href="{{ url_for('battle_list') }}" class="menu-link">⚔️ 싸우기</a>
             {% endif %}
-                
-                    <a href="{{ url_for('view_rankings') }}" class="menu-link">🏆 랭킹보기</a>
-                
+            
+            {% if role != 'Admin' %}
+                <a href="{{ url_for('view_rankings') }}" class="menu-link">🏆 랭킹보기</a>
+            {% endif %}
         </div>
     </div>
 

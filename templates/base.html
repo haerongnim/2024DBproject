@@ -83,6 +83,10 @@
                         <li class="nav-item">
                             <a class="nav-link" href="{{ url_for('view_game_history') }}">게임 기록</a>
                         </li>
+                    {% elif session['role'] == 'Admin' %}
+                        <li class="nav-item">
+                            <a class="nav-link" href="{{ url_for('view_dead_users') }}">사용자 관리</a>
+                        </li>
                     {% endif %}
                 </ul>
             </div>

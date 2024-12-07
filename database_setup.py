@@ -146,6 +146,31 @@ def create_tables():
             magic_id INTEGER PRIMARY KEY REFERENCES Magic(magic_id),  -- Magic 테이블의 magic_id를 참조
             price DECIMAL(10,2) NOT NULL    -- 마법의 판매 가격
         )
+        """,
+        # Admin 테이블: 관리자
+        """
+        CREATE TABLE IF NOT EXISTS Admin (
+            admin_id INTEGER PRIMARY KEY REFERENCES Person(id)
+        )
+        """,
+        # dead_users View
+        """
+        CREATE OR REPLACE VIEW dead_users AS
+        SELECT 
+            p.id,
+            p.name,
+            p.email,
+            CASE 
+                WHEN s.student_id IS NOT NULL THEN 'Student'
+                WHEN v.villain_id IS NOT NULL THEN 'Villain'
+                WHEN m.muggle_id IS NOT NULL THEN 'Muggle'
+            END as role,
+            COALESCE(s.heart, v.heart, m.heart) as heart
+        FROM Person p
+        LEFT JOIN Student s ON p.id = s.student_id
+        LEFT JOIN Villain v ON p.id = v.villain_id
+        LEFT JOIN Muggle m ON p.id = m.muggle_id
+        WHERE COALESCE(s.heart, v.heart, m.heart) <= 0;
         """
     ]
 
@@ -403,8 +428,36 @@ def drop_match_table():
         if conn is not None:
             conn.close()
 
+def insert_admin():
+    conn = get_db_connection()
+    cur = conn.cursor()
+    
+    try:
+        # 관리자 계정이 이미 존재하는지 확인
+        cur.execute("SELECT * FROM Person WHERE email = 'admin@admin'")
+        if cur.fetchone() is None:
+            # Person 테이블에 관리자 추가
+            cur.execute(
+                "INSERT INTO Person (name, email, password) VALUES (%s, %s, %s) RETURNING id",
+                ('관리자', 'admin@admin', generate_password_hash('admin'))
+            )
+            admin_id = cur.fetchone()[0]
+            
+            # Admin 테이블에 추가
+            cur.execute("INSERT INTO Admin (admin_id) VALUES (%s)", (admin_id,))
+            
+            conn.commit()
+            print("Admin account created successfully")
+    except Exception as e:
+        conn.rollback()
+        print(f"Error creating admin account: {e}")
+    finally:
+        cur.close()
+        conn.close()
+
 if __name__ == '__main__':
     create_tables()
+    insert_admin()
     #insert_test_data()
     #view_test_data()
     #drop_all_tables()
