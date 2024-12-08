@@ -428,6 +428,37 @@ def drop_match_table():
         if conn is not None:
             conn.close()
 
+def make_admin():
+    conn = get_db_connection()
+    cur = conn.cursor()
+
+    try:
+        # admin 역할 생성
+        cur.execute("CREATE ROLE admin;")
+
+        cur.execute("GRANT SELECT ON dead_users TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Magic_NSentence TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Enrollment TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Student TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON ItemOwnership TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Muggle TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Villain TO admin;")
+        cur.execute("GRANT SELECT, DELETE ON Person TO admin;")
+
+        # admin@admin 사용자 생성
+        cur.execute("CREATE USER \"admin@admin\" WITH PASSWORD 'admin';")
+
+        # 사용자에게 admin 역할 부여
+        cur.execute("GRANT admin TO \"admin@admin\";")
+
+        conn.commit()
+        print("Admin role and user created successfully")
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(f"Error creating admin role and user: {error}")
+    finally:
+        if conn is not None:
+            conn.close()
+
 def insert_admin():
     conn = get_db_connection()
     cur = conn.cursor()
@@ -457,8 +488,9 @@ def insert_admin():
 
 if __name__ == '__main__':
     create_tables()
+    make_admin()
     insert_admin()
-    #insert_test_data()
+    insert_test_data()
     #view_test_data()
     #drop_all_tables()
     #view_test_data()
