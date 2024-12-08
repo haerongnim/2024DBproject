@@ -35,20 +35,29 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')  # 호스트 주소(기본값: local
 DB_PORT = os.getenv('DB_PORT', '5432')      # 포트 번호(기본값: 5432)
 
 # PostgreSQL 데이터베이스 연결을 생성하는 함수
-def get_db_connection():
+def get_db_connection(admin=False):
     """
     PostgreSQL 데이터베이스 연결을 생성하고 반환하는 함수
     환경변수에 저장된 연결 정보를 사용하여 데이터베이스에 연결
     Returns:
         psycopg2.connection: 데이터베이스 연결 객체
     """
-    return psycopg2.connect(
+    if admin:
+        return psycopg2.connect(
         database=DB_NAME,      # 데이터베이스 이름
-        user=DB_USER,          # 사용자 이름
-        password=DB_PASSWORD,   # 비밀번호
+        user='admin@admin',          # 사용자 이름
+        password='admin',   # 비밀번호
         host=DB_HOST,          # 호스트 주소 (127.0.0.1과 동일)
         port=DB_PORT,          # 포트 번호
-    )
+        )
+    else:
+        return psycopg2.connect(
+            database=DB_NAME,      # 데이터베이스 이름
+            user=DB_USER,          # 사용자 이름
+            password=DB_PASSWORD,   # 비밀번호
+            host=DB_HOST,          # 호스트 주소 (127.0.0.1과 동일)
+            port=DB_PORT,          # 포트 번호
+        )
 
 
 # 로그인 필수 데코레이터 - 비로그인 사용자 접근 제한
@@ -177,7 +186,7 @@ def login():
                 session['user_id'] = user[0]  # id
                 session['username'] = user[1]  # name
                 
-                # 역할 확�
+                # 역할 확인
                 cur.execute("SELECT * FROM Admin WHERE admin_id = %s", (user[0],))
                 if cur.fetchone():
                     session['role'] = 'Admin'
@@ -2017,7 +2026,7 @@ def view_rankings():
 @login_required
 @admin_required
 def delete_user(user_id):
-    conn = get_db_connection()
+    conn = get_db_connection(admin=True)
     cur = conn.cursor()
     
     try:
@@ -2064,7 +2073,7 @@ def delete_user(user_id):
 @login_required
 @admin_required
 def view_dead_users():
-    conn = get_db_connection()
+    conn = get_db_connection(admin=True)
     cur = conn.cursor()
     
     try:
