@@ -33,12 +33,11 @@ psql -U postgres
 ALTER USER your_username WITH CREATEROLE;
 ```
 
-## 2. database_setup.py 실행
+## 3. database_setup.py 실행
 데이터 베이스 setup을 통해 필요한 테이블을 만들어 줍니다
 
-
-## 3. server.py 실행
+## 4. server.py 실행
 서버를 실행하고 127.0.0.1:5000 으로 접속하세요
 
-## 4. Enjoy!
+## 5. Enjoy!
 저희가 만든 게임을 즐겨보세요!!!!!
