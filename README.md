@@ -20,8 +20,25 @@ DB_PORT="5432"
 SECRET_KEY=your_very_long_and_very_random_secret_key
 ```
 
-## 2. server.py 실행
+## 2. Create Role 권한 부여하기
+.env에 작성한 user에게 CREATEROLE 권한을 부여합니다.
+
+1. postgres 계정으로 접속
+```bash
+psql -U postgres
+```
+
+2. 권한 부여
+```SQL
+ALTER USER your_username WITH CREATEROLE;
+```
+
+## 2. database_setup.py 실행
+데이터 베이스 setup을 통해 필요한 테이블을 만들어 줍니다
+
+
+## 3. server.py 실행
 서버를 실행하고 127.0.0.1:5000 으로 접속하세요
 
-## 3. Enjoy!
+## 4. Enjoy!
 저희가 만든 게임을 즐겨보세요!!!!!
