@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .history-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    .history-table th {
+        background-color: #4e0061;
+        color: white;
+        padding: 15px;
+        text-align: left;
+    }
+    .history-table td {
+        padding: 12px 15px;
+        border-bottom: 1px solid #eee;
+    }
+    .history-table tr:last-child td {
+        border-bottom: none;
+    }
+    .history-table tr:hover {
+        background-color: #f8f9fa;
+    }
+</style>
+
+<div class="container mt-4">
+    <h2 class="mb-4">🎮 게임 기록</h2>
+    <table class="history-table">
+        <thead>
+            <tr>
+                <th>게임</th>
+                <th>시도 횟수</th>
+                <th>성공 횟수</th>
+                <th>성공률</th>
+                <th>마지막 플레이</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for game in game_history %}
+            <tr>
+                <td>{{ game[0] }}</td>
+                <td>{{ game[1] }}</td>
+                <td>{{ game[2] }}</td>
+                <td>{{ "%.1f"|format(game[2] / game[1] * 100) }}%</td>
+                <td>{{ game[3].strftime('%Y-%m-%d %H:%M:%S') }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %} 

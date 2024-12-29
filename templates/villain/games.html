@@ -1,0 +1,69 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .game-list {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 20px;
+        padding: 20px 0;
+    }
+    .game-card {
+        background: white;
+        border-radius: 15px;
+        padding: 20px;
+        text-decoration: none;
+        color: #333;
+        transition: all 0.3s ease;
+        border: 1px solid #e0e0e0;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        display: flex;
+        flex-direction: column;
+    }
+    .game-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 5px 15px rgba(78, 0, 97, 0.2);
+        border-color: #4e0061;
+    }
+    .game-title {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #4e0061;
+        margin-bottom: 10px;
+    }
+    .game-info {
+        display: flex;
+        justify-content: space-between;
+        margin: 10px 0;
+        color: #666;
+    }
+    .difficulty {
+        color: #ffa500;
+    }
+    .reward {
+        color: #4e0061;
+        font-weight: bold;
+    }
+    .game-description {
+        color: #666;
+        margin-top: 10px;
+        line-height: 1.4;
+    }
+</style>
+
+<div class="container mt-4">
+    <h2 class="mb-4">🎮 미니게임 목록</h2>
+    <div class="game-list">
+        {% for game in games %}
+        <a href="{{ url_for(game.route_name) }}" class="game-card">
+            <div class="game-title">{{ game.game_name }}</div>
+            <div class="game-info">
+                <span class="difficulty">난이도: {{ "★" * game.difficulty }}{{ "☆" * (3 - game.difficulty) }}</span>
+                <span class="reward">보상: 공격력 +{{ game.reward }}</span>
+            </div>
+            <p class="game-description">{{ game.game_description }}</p>
+        </a>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %} 

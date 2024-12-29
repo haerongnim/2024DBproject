@@ -1,0 +1,217 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<style>
+    .grade-container {
+        background: white;
+        border-radius: 20px;
+        padding: 30px;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .magic-section {
+        margin-bottom: 30px;
+        padding: 25px;
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+    .magic-section:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .magic-title {
+        color: #4e0061;
+        margin-bottom: 20px;
+        padding-bottom: 12px;
+        border-bottom: 2px solid #4e0061;
+        font-weight: bold;
+        position: relative;
+    }
+    .magic-title::after {
+        content: '🔮';
+        position: absolute;
+        right: 10px;
+        top: 0;
+    }
+    .student-list {
+        display: grid;
+        gap: 20px;
+    }
+    .student-card {
+        background: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.08);
+        transition: all 0.3s ease;
+        border: 1px solid rgba(78,0,97,0.1);
+    }
+    .student-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 15px rgba(0,0,0,0.12);
+    }
+    .student-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid rgba(78,0,97,0.1);
+    }
+    .student-info h4 {
+        color: #4e0061;
+        font-weight: bold;
+        margin: 0;
+    }
+    .student-power {
+        background: linear-gradient(45deg, #4e0061, #6a0572);
+        color: white;
+        padding: 5px 15px;
+        border-radius: 20px;
+        font-size: 0.9em;
+        box-shadow: 0 2px 5px rgba(78,0,97,0.2);
+    }
+    .nsentence-content {
+        background: rgba(78,0,97,0.05);
+        padding: 15px;
+        border-radius: 10px;
+        margin: 15px 0;
+        border-left: 4px solid #4e0061;
+        font-style: italic;
+    }
+    .grade-input {
+        display: flex;
+        gap: 15px;
+        align-items: center;
+        margin-top: 15px;
+    }
+    .grade-input input {
+        width: 100px;
+        padding: 8px 15px;
+        border: 2px solid rgba(78,0,97,0.2);
+        border-radius: 10px;
+        font-size: 1em;
+        transition: all 0.3s ease;
+    }
+    .grade-input input:focus {
+        outline: none;
+        border-color: #4e0061;
+        box-shadow: 0 0 0 3px rgba(78,0,97,0.1);
+    }
+    .grade-input button {
+        padding: 8px 20px;
+        background: linear-gradient(45deg, #4e0061, #6a0572);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 5px rgba(78,0,97,0.2);
+    }
+    .grade-input button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 10px rgba(78,0,97,0.3);
+        background: linear-gradient(45deg, #6a0572, #4e0061);
+    }
+    .completed-grade {
+        background: #4e0061;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 10px;
+        display: inline-block;
+        margin-top: 10px;
+    }
+    .no-nsentence {
+        color: #6c757d;
+        font-style: italic;
+        padding: 10px;
+        text-align: center;
+        background: rgba(0,0,0,0.05);
+        border-radius: 10px;
+    }
+    h2 {
+        color: #4e0061;
+        margin-bottom: 30px;
+        font-weight: bold;
+        position: relative;
+        padding-bottom: 15px;
+    }
+    h2::after {
+        content: '';
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 50px;
+        height: 3px;
+        background: linear-gradient(45deg, #4e0061, #6a0572);
+        border-radius: 2px;
+    }
+</style>
+
+<div class="grade-container">
+    <h2>📚 학생 성적 관리</h2>
+    
+    {% for magic in magic_groups %}
+        <div class="magic-section">
+            <h3 class="magic-title">🔮 {{ magic[1] }}</h3>
+            <div class="student-list">
+                {% for i in range(magic[2]|length) %}
+                    <div class="student-card">
+                        <div class="student-info">
+                            <h4>👤 {{ magic[2][i] }}</h4>
+                            <span class="student-power">⚔️ 공격력: {{ magic[4][i] }}</span>
+                        </div>
+                        
+                        {% if magic[5][i] %}
+                            <div class="nsentence-content">{{ magic[5][i] }}</div>
+                            {% if magic[6][i] is none %}
+                                <div class="grade-input">
+                                    <input type="number" min="0" max="100" placeholder="점수 입력">
+                                    <button onclick="submitGrade(this, {{ magic[0] }}, {{ magic[3][i] }})">평가하기</button>
+                                </div>
+                            {% else %}
+                                <div class="completed-grade">✅ 평가 완료: {{ magic[6][i] }}점</div>
+                            {% endif %}
+                        {% else %}
+                            <p class="no-nsentence">📝 아직 N행시를 작성하지 않았습니다.</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+
+<script>
+function submitGrade(button, magicId, studentId) {
+    const scoreInput = button.previousElementSibling;
+    const score = parseInt(scoreInput.value);
+    
+    if (isNaN(score) || score < 0 || score > 100) {
+        alert('0에서 100 사이의 점수를 입력해주세요.');
+        return;
+    }
+
+    fetch('/professor/submit_grade', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `magic_id=${magicId}&student_id=${studentId}&score=${score}`
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            alert(data.message);
+            location.reload();
+        } else {
+            alert(data.message);
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        alert('오류가 발생했습니다.');
+    });
+}
+</script>
+{% endblock %}

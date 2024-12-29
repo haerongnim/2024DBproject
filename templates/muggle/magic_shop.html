@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .magic-container { margin-top: 20px; }
+        .magic-card {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .cannot-buy { opacity: 0.5; }
+        .money-status {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: white;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        button {
+            padding: 5px 10px;
+            background-color: #4e0061;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #4e0061;
+        }
+        .power { color: blue; }
+        .price { color: #4e0061; }
+        .creator { color: purple; font-style: italic; }
+    </style>
+
+    <div class="money-status">
+        💰 보유금액: {{ money }}G
+    </div>
+    
+    <h2>마법 상점</h2>
+    <div class="magic-container">
+        {% for magic in magics %}
+            <div class="magic-card {% if not magic[4] %}cannot-buy{% endif %}">
+                <div class="magic-info">
+                    <h3>{{ magic[1] }}</h3>
+                    <div class="power">⚔️ 공격력: +{{ magic[2] }}</div>
+                    <div class="price">💰 가격: {{ magic[3] }}G</div>
+                    <div class="creator">🧙‍♂️ 제작자: {{ magic[5] if magic[5] else '알 수 없음' }}</div>
+                </div>
+                {% if magic[4] %}
+                    <button onclick="buyMagic('{{ magic[0] }}')">구매하기</button>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function buyMagic(magicId) {
+            fetch(`/muggle/buy_magic/${magicId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    location.reload();
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+    </script>
+{% endblock %} 

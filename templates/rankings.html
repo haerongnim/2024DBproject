@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>랭킹</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body { 
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            font-family: 'Arial', sans-serif;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .ranking-container {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .table {
+            margin-bottom: 0;
+        }
+        .table thead th {
+            background: linear-gradient(45deg, #4e0061, #6a0572);
+            color: white;
+            border: none;
+            padding: 15px;
+            font-weight: 500;
+        }
+        .table tbody tr {
+            transition: all 0.3s ease;
+        }
+        .table tbody tr:hover {
+            background-color: rgba(78,0,97,0.05);
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .table td {
+            padding: 15px;
+            vertical-align: middle;
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        .search-container {
+            background: white;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .search-input {
+            padding: 10px 15px;
+            border: 1px solid rgba(78,0,97,0.2);
+            border-radius: 10px;
+            width: 250px;
+            transition: all 0.3s ease;
+        }
+        .search-input:focus {
+            outline: none;
+            border-color: #4e0061;
+            box-shadow: 0 0 0 2px rgba(78,0,97,0.1);
+        }
+        .sort-button {
+            padding: 8px 15px;
+            margin-left: 10px;
+            background: linear-gradient(45deg, #4e0061, #6a0572);
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 5px rgba(78,0,97,0.2);
+        }
+        .sort-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(78,0,97,0.3);
+            background: linear-gradient(45deg, #6a0572, #4e0061);
+        }
+        .role-filter {
+            padding: 10px 15px;
+            border: 1px solid rgba(78,0,97,0.2);
+            border-radius: 10px;
+            margin-right: 10px;
+            color: #4e0061;
+            background-color: white;
+            transition: all 0.3s ease;
+        }
+        .role-filter:focus {
+            outline: none;
+            border-color: #4e0061;
+            box-shadow: 0 0 0 2px rgba(78,0,97,0.1);
+        }
+        .back-button {
+            display: inline-block;
+            padding: 10px 20px;
+            color: white;
+            text-decoration: none;
+            font-weight: 500;
+            border-radius: 12px;
+            transition: all 0.3s ease;
+            background: linear-gradient(45deg, #4e0061, #6a0572);
+            box-shadow: 0 2px 10px rgba(78,0,97,0.2);
+            margin-bottom: 20px;
+        }
+        .back-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(78,0,97,0.3);
+            background: linear-gradient(45deg, #6a0572, #4e0061);
+            color: white;
+            text-decoration: none;
+        }
+        h2 {
+            color: #4e0061;
+            font-weight: bold;
+            margin-bottom: 20px;
+            position: relative;
+            padding-bottom: 10px;
+        }
+        h2::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 50px;
+            height: 3px;
+            background: linear-gradient(45deg, #4e0061, #6a0572);
+            border-radius: 2px;
+        }
+        .rank-number {
+            font-weight: bold;
+            color: #4e0061;
+        }
+        .top-3 {
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="{{ url_for('home') }}" class="back-button">← 돌아가기</a>
+        <h2>🏆 랭킹</h2>
+        
+        <div class="search-container">
+            <div class="d-flex align-items-center flex-wrap gap-2">
+                <input type="text" id="searchInput" class="search-input" placeholder="이름으로 검색...">
+                {% if role == 'Professor' %}
+                <select id="roleFilter" class="role-filter">
+                    <option value="all">전체</option>
+                    <option value="Student">학생</option>
+                    <option value="Villain">빌런</option>
+                    <option value="Muggle">머글</option>
+                </select>
+                {% endif %}
+                <button onclick="sortRankings('asc')" class="sort-button">▲ 오름차순</button>
+                <button onclick="sortRankings('desc')" class="sort-button">▼ 내림차순</button>
+            </div>
+        </div>
+
+        <div class="ranking-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>순위</th>
+                        <th>이름</th>
+                        {% if role == 'Professor' %}
+                        <th>역할</th>
+                        {% endif %}
+                        <th>공격력</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingTable">
+                    {% for user in rankings %}
+                    <tr class="{{ 'top-3' if loop.index <= 3 }}">
+                        <td class="rank-number">
+                            {% if loop.index == 1 %}
+                                🥇
+                            {% elif loop.index == 2 %}
+                                🥈
+                            {% elif loop.index == 3 %}
+                                🥉
+                            {% else %}
+                                {{ loop.index }}
+                            {% endif %}
+                        </td>
+                        <td>{{ user.name }}</td>
+                        {% if role == 'Professor' %}
+                        <td>{{ user.role }}</td>
+                        {% endif %}
+                        <td>⚔️ {{ user.attack_power }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        function filterTable() {
+            const input = document.getElementById('searchInput');
+            const filter = input.value.toLowerCase();
+            const roleFilter = document.getElementById('roleFilter')?.value || '{{ role }}';
+            const rows = document.getElementById('rankingTable').getElementsByTagName('tr');
+
+            for (let row of rows) {
+                const nameCell = row.cells[1];
+                const roleCell = row.cells.length > 3 ? row.cells[2] : null;
+                const name = nameCell.textContent || nameCell.innerText;
+                
+                let showRow = name.toLowerCase().includes(filter);
+                if (roleFilter !== 'all' && roleCell) {
+                    showRow = showRow && (roleCell.textContent === roleFilter);
+                }
+                
+                row.style.display = showRow ? '' : 'none';
+            }
+        }
+
+        function getRankNumber(rankCell) {
+            const text = rankCell.textContent.trim();
+            if (text === '🥇') return 1;
+            if (text === '🥈') return 2;
+            if (text === '🥉') return 3;
+            return parseInt(text) || 0;
+        }
+
+        function sortRankings(order) {
+            const table = document.getElementById('rankingTable');
+            const rows = Array.from(table.getElementsByTagName('tr'));
+            
+            rows.sort((a, b) => {
+                const aRank = getRankNumber(a.cells[0]);
+                const bRank = getRankNumber(b.cells[0]);
+                
+                return order === 'asc' ? aRank - bRank : bRank - aRank;
+            });
+            
+            rows.forEach(row => {
+                table.appendChild(row);
+            });
+        }
+
+        document.getElementById('searchInput').addEventListener('keyup', filterTable);
+        if (document.getElementById('roleFilter')) {
+            document.getElementById('roleFilter').addEventListener('change', filterTable);
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>전투 상대 목록</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f2f5;
+        }
+        .controls {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+            background-color: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .sort-controls {
+            display: flex;
+            gap: 10px;
+        }
+        select, button {
+            padding: 8px 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: white;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #f5f5f5;
+        }
+        .opponent-list {
+            display: grid;
+            gap: 15px;
+        }
+        .opponent-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .opponent-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .opponent-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .role-icon {
+            font-size: 1.5em;
+        }
+        .role-badge {
+            padding: 5px 10px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            color: white;
+        }
+        .Muggle { background-color: #3498db; }
+        .Student { background-color: #2ecc71; }
+        .Villain { background-color: #e74c3c; }
+        .back-link {
+            display: inline-block;
+            margin-top: 20px;
+            color: #4e0061;
+            text-decoration: none;
+            font-weight: bold;
+            padding: 8px 15px;
+            border: 2px solid #4e0061;
+            border-radius: 5px;
+            transition: all 0.3s ease;
+        }
+        .back-link:hover {
+            background-color: #4e0061;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 2px 5px rgba(78, 0, 97, 0.2);
+        }
+    </style>
+</head>
+<body>
+    <a href="{{ url_for('home') }}" class="back-link">← 홈으로 돌아가기</a>
+    <h2>전투 상대 목록</h2>
+    
+    <div class="controls">
+        <div class="sort-controls">
+            <select id="roleFilter">
+                <option value="all">모든 직업</option>
+                {% if current_role != 'Muggle' %}
+                    <option value="Muggle">머글</option>
+                {% endif %}
+                {% if current_role != 'Student' %}
+                    <option value="Student">학생</option>
+                {% endif %}
+                {% if current_role != 'Villain' %}
+                    <option value="Villain">빌런</option>
+                {% endif %}
+            </select>
+            <select id="sortBy">
+                <option value="name_asc">이름 오름차순</option>
+                <option value="name_desc">이름 내림차순</option>
+                <option value="role_asc">직업 오름차순</option>
+                <option value="role_desc">직업 내림차순</option>
+            </select>
+        </div>
+    </div>
+
+    <div class="opponent-list" id="opponentList">
+        {% for opponent in opponents %}
+        <div class="opponent-card" onclick="initiateBattle('{{ opponent.id }}')">
+            <div class="opponent-info">
+                <span class="role-icon">
+                    {% if opponent.role == 'Muggle' %}👤
+                    {% elif opponent.role == 'Student' %}🎓
+                    {% elif opponent.role == 'Villain' %}😈
+                    {% endif %}
+                </span>
+                <div>
+                    <h3>{{ opponent.name }}</h3>
+                    <span class="role-badge {{ opponent.role }}">{{ opponent.role }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <script>
+        function initiateBattle(opponentId) {
+            if (!confirm('이 상대와 전투를 시작하시겠습니까?')) return;
+            
+            fetch('/battle', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    opponent_id: opponentId
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert(data.message);
+                    window.location.href = "{{ url_for('home') }}";
+                } else {
+                    alert(data.message);
+                }
+            });
+        }
+
+        // 정렬 및 필터링
+        document.getElementById('roleFilter').addEventListener('change', updateList);
+        document.getElementById('sortBy').addEventListener('change', updateList);
+
+        function updateList() {
+            const roleFilter = document.getElementById('roleFilter').value;
+            const sortBy = document.getElementById('sortBy').value;
+
+            fetch(`/battle_list?role=${roleFilter}&sort=${sortBy}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'  // AJAX 요청임을 표시
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                const list = document.getElementById('opponentList');
+                list.innerHTML = data.opponents.map(opponent => `
+                    <div class="opponent-card" onclick="initiateBattle(${opponent.id})">
+                        <div class="opponent-info">
+                            <span class="role-icon">
+                                ${getRoleIcon(opponent.role)}
+                            </span>
+                            <div>
+                                <h3>${opponent.name}</h3>
+                                <span class="role-badge ${opponent.role}">${opponent.role}</span>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            })
+            .catch(error => console.error('Error:', error));
+        }
+
+        function getRoleIcon(role) {
+            switch(role) {
+                case 'Muggle': return '👤';
+                case 'Student': return '🎓';
+                case 'Villain': return '😈';
+                default: return '❓';
+            }
+        }
+    </script>
+</body>
+</html> 

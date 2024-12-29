@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>로그인</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #6a0572, #ab83a1);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+        }
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0,0,0,0.2);
+            max-width: 400px;
+            width: 90%;
+            margin: 0 auto;
+        }
+        .form-control:focus {
+            border-color: #4e0061;
+            box-shadow: 0 0 0 0.2rem rgba(78,0,97,0.25);
+        }
+        .btn-primary {
+            background-color: #4e0061;
+            border-color: #4e0061;
+            width: 100%;
+            padding: 10px;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+        .btn-primary:hover {
+            background-color: #3d004d;
+            border-color: #3d004d;
+        }
+        .login-title {
+            color: #4e0061;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            font-weight: bold;
+        }
+        .signup-link {
+            text-align: center;
+            margin-top: 1rem;
+        }
+        .signup-link a {
+            color: #4e0061;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .signup-link a:hover {
+            text-decoration: underline;
+        }
+        .messages {
+            color: #dc3545;
+            text-align: center;
+            margin-bottom: 1rem;
+            padding: 10px;
+            background-color: #f8d7da;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="login-container">
+            <h2 class="login-title">마법 학교 로그인</h2>
+            {% with messages = get_flashed_messages() %}
+                {% if messages %}
+                    <div class="messages">
+                        {{ messages[0] }}
+                    </div>
+                {% endif %}
+            {% endwith %}
+            <form method="POST">
+                <div class="mb-3">
+                    <label class="form-label">이메일</label>
+                    <input type="email" name="email" class="form-control" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">비밀번호</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary">로그인</button>
+            </form>
+            <div class="signup-link">
+                <p>계정이 없으신가요? <a href="{{ url_for('signup') }}">회원가입</a></p>
+            </div>
+        </div>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

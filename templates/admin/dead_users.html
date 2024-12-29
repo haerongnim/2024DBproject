@@ -1,0 +1,53 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>생명력이 0 이하인 사용자 목록</h2>
+    
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>이름</th>
+                    <th>이메일</th>
+                    <th>역할</th>
+                    <th>생명력</th>
+                    <th>작업</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for user in dead_users %}
+                <tr>
+                    <td>{{ user[1] }}</td>
+                    <td>{{ user[2] }}</td>
+                    <td>{{ user[3] }}</td>
+                    <td>{{ user[4] }}</td>
+                    <td>
+                        <button class="btn btn-danger btn-sm" onclick="deleteUser({{ user[0] }})">
+                            삭제
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function deleteUser(userId) {
+    if (confirm('정말 이 사용자를 삭제하시겠습니까?')) {
+        fetch(`/admin/delete_user/${userId}`, {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            if (data.success) {
+                location.reload();
+            }
+        });
+    }
+}
+</script>
+{% endblock %} 
